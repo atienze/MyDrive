@@ -26,8 +26,7 @@ func ScanDirectory(rootPath string) ([]FileMeta, error) {
 			return err
 		}
 
-		// 1. IGNORE LOGIC
-		// If it is a directory, check if we should skip it
+		// 1. IGNORE DIRECTORIES
 		if d.IsDir() {
 			// Skip the ".git" folder (too much noise)
 			// Skip the "server" folder (prevent infinite recursion loop)
@@ -37,6 +36,12 @@ func ScanDirectory(rootPath string) ([]FileMeta, error) {
 			return nil
 		}
 
+		// 2. IGNORE SPECIFIC FILES
+		if d.Name() == ".DS_Store" {
+			return nil // Just skip this single file
+		}
+
+		// 3. HASH LOGIC
 		// Calculate the Hash (Using the tool we built in 'common')
 		hash, err := crypto.CalculateFileHash(path)
 		if err != nil {

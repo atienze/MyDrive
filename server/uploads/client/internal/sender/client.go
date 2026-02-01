@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"net"
 	"os"
 
@@ -53,30 +54,96 @@ func ConnectAndPing(serverAddr string) {
 	fmt.Println("Ping sent! Check your server logs.")
 }
 
-// SendFile wraps the data and ships it using an EXISTING encoder
-// CHANGE: We now ask for *protocol.Encoder, not net.Conn
-func SendFile(encoder *protocol.Encoder, path string, hash string, content []byte) error {
-	
-	// 1. Pack the FileTransfer (Payload)
+// SendFile streams the file in chunks
+func SendFile(encoder *protocol.Encoder, path string, hash string, size int64) error {
+	// 1. Open the file (Do NOT read the whole thing)
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// 2. Send the Header (Metadata)
 	ft := protocol.FileTransfer{
 		RelPath: path,
 		Hash:    hash,
-		Content: content,
+		Size:    size,
 	}
-
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(ft); err != nil {
+	
+	var headerBuf bytes.Buffer
+	if err := gob.NewEncoder(&headerBuf).Encode(ft); err != nil {
 		return err
 	}
 
-	// 2. Wrap it in a Packet
-	packet := protocol.Packet{
+	headerPacket := protocol.Packet{
 		Cmd:     protocol.CmdSendFile,
+		Payload: headerBuf.Bytes(),
+	}
+	
+	if err := encoder.Encode(headerPacket); err != nil {
+		return err
+	}
+
+	// 3. Stream the Data (Chunks)
+	// We use a 32KB buffer. Small enough for network safety, big enough for speed.
+	buffer := make([]byte, 32*1024) 
+	
+	for {
+		n, err := file.Read(buffer)
+		if err != nil {
+			if err == io.EOF {
+				break // Done reading
+			}
+			return err
+		}
+
+		// Wrap the chunk in a packet
+		chunkPacket := protocol.Packet{
+			Cmd:     protocol.CmdFileChunk,
+			Payload: buffer[:n], // Only send the bytes we actually read
+		}
+
+		if err := encoder.Encode(chunkPacket); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func VerifyFile(encoder *protocol.Encoder, decoder *protocol.Decoder, path string, hash string) (bool, error) {
+	// 1. Send the Question
+	req := protocol.CheckFileRequest{RelPath: path, Hash: hash}
+	
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(req); err != nil {
+		return false, err
+	}
+
+	packet := protocol.Packet{
+		Cmd:     protocol.CmdCheckFile,
 		Payload: buf.Bytes(),
 	}
 
-	// 3. Send using the shared encoder
-	// (No more NewEncoder() here!)
-	return encoder.Encode(packet)
+	if err := encoder.Encode(packet); err != nil {
+		return false, err
+	}
+
+	// 2. Wait for the Answer
+	// We need to listen for the NEXT packet from the server
+	var respPacket protocol.Packet
+	if err := decoder.Decode(&respPacket); err != nil {
+		return false, err
+	}
+
+	if respPacket.Cmd != protocol.CmdFileStatus {
+		return false, fmt.Errorf("unexpected command: %d", respPacket.Cmd)
+	}
+
+	var resp protocol.FileStatusResponse
+	if err := gob.NewDecoder(bytes.NewBuffer(respPacket.Payload)).Decode(&resp); err != nil {
+		return false, err
+	}
+
+	return resp.Status == protocol.StatusNeed, nil
 }

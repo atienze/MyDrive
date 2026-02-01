@@ -7,26 +7,44 @@ import (
 
 // Commands
 const (
-	CmdPing     = 1
-	CmdSendFile = 2
+	CmdPing       = 1
+	CmdSendFile   = 2 // The Header (Metadata)
+	CmdCheckFile  = 3
+	CmdFileStatus = 4
+	CmdFileChunk  = 5 // New: A piece of the file
+)
+
+// Status Responses
+const (
+	StatusNeed = 1
+	StatusSkip = 2
 )
 
 // Packet is the generic envelope
 type Packet struct {
 	Cmd     uint8
-	Payload []byte // This will hold the Gob-encoded data
+	Payload []byte
 }
 
-// FileTransfer is the specific data we put inside the Envelope
+// FileTransfer is now JUST the Header (No Content field!)
 type FileTransfer struct {
-	RelPath string // "client/main.go"
-	Hash    string // "a1b2c3..."
-	Content []byte // The actual file data
+	RelPath string
+	Hash    string
+	Size    int64 // We need to know when to stop reading
 }
 
-// --- Helper Tools for the Network ---
+// CheckFileRequest
+type CheckFileRequest struct {
+	RelPath string
+	Hash    string
+}
 
-// Encoder wrapper
+// FileStatusResponse
+type FileStatusResponse struct {
+	Status uint8
+}
+
+// --- Helpers (Same as before) ---
 type Encoder struct {
 	inner *gob.Encoder
 }
@@ -39,7 +57,6 @@ func (e *Encoder) Encode(p Packet) error {
 	return e.inner.Encode(p)
 }
 
-// Decoder wrapper
 type Decoder struct {
 	inner *gob.Decoder
 }
