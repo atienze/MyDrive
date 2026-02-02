@@ -1,91 +1,84 @@
 package main
 
 import (
-	"encoding/gob"
-	"fmt"
-	"net"
-	"os"
-	"time"
+    "encoding/gob"
+    "fmt"
+    "log"
+    "net"
+    "time"
 
-	"github.com/atienze/HomelabSecureSync/client/internal/scanner"
-	"github.com/atienze/HomelabSecureSync/client/internal/sender"
-	"github.com/atienze/HomelabSecureSync/common/protocol"
+    "github.com/atienze/HomelabSecureSync/client/internal/scanner"
+    "github.com/atienze/HomelabSecureSync/client/internal/sender"
+    "github.com/atienze/HomelabSecureSync/common/protocol"
 )
 
 func main() {
-	// 1. Configuration
-	serverAddr := "localhost:9000"
-	targetDir := "." 
+    fmt.Println("--- Vault-Sync Manual Backup ---")
 
-	startTime := time.Now()
-	fmt.Println("--- Vault-Sync Manual Backup ---")
-	fmt.Printf("Target: %s\n", targetDir)
-	fmt.Printf("Server: %s\n", serverAddr)
+    // Configuration
+    targetDir := "/Users/<user>/VaultDrive" 
+    serverAddr := "<server-ip>:9000"
 
-	// 2. Connect
-	conn, err := net.Dial("tcp", serverAddr)
-	if err != nil {
-		fmt.Printf("❌ Could not connect to server: %v\n", err)
-		os.Exit(1)
-	}
-	defer conn.Close()
+    fmt.Printf("Target: %s\n", targetDir)
+    fmt.Printf("Server: %s\n", serverAddr)
 
-	// 3. Handshake
-	shake := protocol.Handshake{MagicNumber: protocol.MagicNumber, Version: protocol.Version, ClientID: "Laptop-01"}
-	gob.NewEncoder(conn).Encode(shake)
-	
-	networkEncoder := protocol.NewEncoder(conn)
-	networkDecoder := protocol.NewDecoder(conn)
+    // Scan
+    fmt.Print("Scanning files... ")
+    files, err := scanner.ScanDirectory(targetDir)
+    if err != nil {
+        log.Fatalf("Scan failed: %v", err)
+    }
+    fmt.Printf("Found %d files.\n", len(files))
 
-	// 4. Scan
-	fmt.Print("Scanning files... ")
-	files, err := scanner.ScanDirectory(targetDir)
-	if err != nil {
-		fmt.Printf("❌ Scan failed: %v\n", err)
-		return
-	}
-	fmt.Printf("Found %d files.\n", len(files))
+    // Connect
+    conn, err := net.Dial("tcp", serverAddr)
+    if err != nil {
+        log.Fatalf("Connection failed: %v", err)
+    }
+    defer conn.Close()
 
-	// 5. Sync Loop
-	uploaded := 0
-	skipped := 0
-	errors := 0
+    // Unified Encoder (Matches Server's rawDecoder)
+    unifiedEncoder := gob.NewEncoder(conn)
+    networkDecoder := protocol.NewDecoder(conn)
 
-	for _, f := range files {
-		// A. Negotiate
-		shouldSend, err := sender.VerifyFile(networkEncoder, networkDecoder, f.Path, f.Hash)
-		if err != nil {
-			fmt.Printf("❌ Error checking %s: %v\n", f.Path, err)
-			errors++
-			continue
-		}
+    // Handshake
+    shake := protocol.Handshake{
+        MagicNumber: protocol.MagicNumber,
+        Version:     protocol.Version,
+        ClientID:    "MacBook-Pro",
+    }
+    if err := unifiedEncoder.Encode(shake); err != nil {
+        log.Fatalf("Handshake send failed: %v", err)
+    }
 
-		if !shouldSend {
-			skipped++
-			continue
-		}
+    // Loop
+    uploadCount := 0
+    start := time.Now()
 
-		// B. Upload (STREAMING MODE)
-		// We do NOT read the file here anymore. We just tell sender to go get it.
-		fmt.Printf("Uploading %s... ", f.Path)
-		
-		// FIX: Pass f.Size instead of 'content'
-		err = sender.SendFile(networkEncoder, f.Path, f.Hash, f.Size)
-		
-		if err != nil {
-			fmt.Printf("FAILED: %v\n", err)
-			errors++
-		} else {
-			fmt.Println("Done.")
-			uploaded++
-		}
-	}
+    for _, file := range files {
+        needed, err := client.VerifyFile(unifiedEncoder, networkDecoder, file.Path, file.Hash)
+        if err != nil {
+            log.Printf("Verification error for %s: %v", file.Path, err)
+            continue
+        }
 
-	// 6. Summary Report
-	duration := time.Since(startTime)
-	fmt.Println("\n--- Sync Complete ---")
-	fmt.Printf("Uploaded: %d\n", uploaded)
-	fmt.Printf("Skipped:  %d\n", skipped)
-	fmt.Printf("Errors:   %d\n", errors)
-	fmt.Printf("Time:     %s\n", duration)
+        if !needed {
+            fmt.Printf("Skipping %s (Already exists)\n", file.Path)
+            continue
+        }
+
+        fmt.Printf("Uploading %s... ", file.Path)
+        err = client.SendFile(unifiedEncoder, targetDir, file.Path, file.Hash, file.Size)
+        
+        if err != nil {
+            fmt.Printf("FAILED: %v\n", err)
+        } else {
+            fmt.Println("Done.")
+            uploadCount++
+        }
+    }
+
+    fmt.Println("\n--- Sync Complete ---")
+    fmt.Printf("Uploaded: %d\n", uploadCount)
+    fmt.Printf("Time:     %s\n", time.Since(start))
 }
