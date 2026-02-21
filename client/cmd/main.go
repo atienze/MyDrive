@@ -16,8 +16,14 @@ func main() {
     fmt.Println("--- Vault-Sync Manual Backup ---")
 
     // Configuration
-    targetDir := "/Users/<user>/VaultDrive" 
-    serverAddr := "<server-ip>:9000"
+    /*
+    
+    "/Users/<user>/VaultDrive"
+    "<server-ip>:9000"
+    
+    */
+    targetDir := "/Users/<user>/Desktop/TestVault" 
+    serverAddr := "127.0.0.1:9000"
 
     fmt.Printf("Target: %s\n", targetDir)
     fmt.Printf("Server: %s\n", serverAddr)
