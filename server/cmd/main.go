@@ -6,8 +6,9 @@ import (
 	"net"
 	"os"
 
+	"github.com/atienze/HomelabSecureSync/server/internal/auth"
+	"github.com/atienze/HomelabSecureSync/server/internal/db"
 	"github.com/atienze/HomelabSecureSync/server/internal/receiver"
-    "github.com/atienze/HomelabSecureSync/server/internal/db"
 )
 
 const Port = ":9000"
@@ -20,39 +21,70 @@ const Port = ":9000"
 const DatabasePath = "./vaultsync.db"
 
 func main() {
-    // --- Step 1: Open the database ---
-    // We open the database ONCE here, then pass it to every connection handler.
-    // This is important — you never want to open a new DB connection per request.
-    database, err := db.Open(DatabasePath)
-	if err != nil {
-		log.Fatalf("Failed to bind to port %s: %v", Port, err)
+	// Subcommand dispatch
+	if len(os.Args) >= 2 && os.Args[1] == "register" {
+		runRegister()
+		return
+	}
+	runServer()
+}
+
+// runRegister handles: vault-sync-server register "DeviceName"
+// Generates a cryptographic token, stores it in the DB, and prints it once to stdout.
+func runRegister() {
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "Usage: vault-sync-server register <device-name>")
 		os.Exit(1)
 	}
+	deviceName := os.Args[2]
 
-	// defer means "run this when main() exits" — ensures the DB is always closed	cleanly
-    defer database.Close()
+	database, err := db.Open(DatabasePath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer database.Close()
 
-	// --- Step 2: Start the TCP listener
+	token, err := auth.GenerateToken()
+	if err != nil {
+		log.Fatalf("Failed to generate token: %v", err)
+	}
+
+	// token becomes the device's primary key in the devices table.
+	// Tokens are 256-bit random values — collision probability is negligible.
+	// Registering the same device name twice produces two different tokens, both valid.
+	if err := database.RegisterDevice(token, deviceName); err != nil {
+		log.Fatalf("Failed to register device: %v", err)
+	}
+
+	// Print the token ONCE — this is the only time it appears in plaintext.
+	// The caller must save it to ~/.vaultsync/config.toml immediately.
+	fmt.Println(token)
+}
+
+// runServer is the main server loop — listens for TCP connections and handles them.
+func runServer() {
+	database, err := db.Open(DatabasePath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer database.Close()
+
 	listener, err := net.Listen("tcp", Port)
-    if err != nil {
-        log.Fatalf("Failed to bind to port %s: %v", Port, err)
-        os.Exit(1)
-    }
-    defer listener.Close()
-	
-	fmt.Printf("Vault-Sync Server Started on Port %s\n", Port)
+	if err != nil {
+		log.Fatalf("Failed to bind to port %s: %v", Port, err)
+	}
+	defer listener.Close()
+
+	fmt.Printf("Vault-Sync Server listening on %s\n", Port)
 	fmt.Println("Database: " + DatabasePath)
 	fmt.Println("Waiting for connections...")
 
-// --- Step 3: Accept connections (same as before, but now pass the DB in) ---
-    for {
-        conn, err := listener.Accept()
-        if err != nil {
-            log.Printf("Failed to accept connection: %v", err)
-            continue
-        }
-        // We now pass 'database' into HandleConnection so the handler can use it.
-        // Each goroutine gets the SAME database handle — that's fine and intentional.
-        go receiver.HandleConnection(conn, database)
-    }
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("Failed to accept connection: %v", err)
+			continue
+		}
+		go receiver.HandleConnection(conn, database)
+	}
 }

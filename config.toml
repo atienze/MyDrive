@@ -1,0 +1,4 @@
+  server_addr           = "127.0.0.1:9000"
+  token                 = "626c6666d797dbfb4fbe7a40b8e52ebb8d9a5cd15b908d8a61b868930c92797f"
+  watch_dir             = "/Users/<user>/Desktop/TestVault"
+  sync_interval_seconds = 60

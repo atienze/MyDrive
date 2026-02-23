@@ -1,18 +1,17 @@
 package receiver
 
 import (
-    "bytes"
-    "encoding/gob"
-    "fmt"
-    "log"
-    "net"
-    "os"
-    "path/filepath"
+	"bytes"
+	"encoding/gob"
+	"fmt"
+	"log"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
 
-    "github.com/atienze/HomelabSecureSync/common/protocol"
-    "github.com/atienze/HomelabSecureSync/server/internal/db"
-    // Note: we no longer import crypto here because we replaced the
-    // filesystem hash check with a database lookup
+	"github.com/atienze/HomelabSecureSync/common/protocol"
+	"github.com/atienze/HomelabSecureSync/server/internal/db"
 )
 
 // VaultDataPath is the root folder where uploaded files are stored on disk.
@@ -24,165 +23,180 @@ import (
 */
 const VaultDataPath = "./uploads"
 
-// HandleConnection now takes a *db.DB as a second argument.
-// The * means it's a pointer — both main() and this function point at the SAME database.
+// HandleConnection validates the device token, then processes file sync commands.
+// conn is closed on return via defer — including on auth failure.
 func HandleConnection(conn net.Conn, database *db.DB) {
-    defer conn.Close()
-    log.Printf("New connection from: %s", conn.RemoteAddr().String())
+	defer conn.Close()
+	log.Printf("New connection from: %s", conn.RemoteAddr().String())
 
-    rawDecoder := gob.NewDecoder(conn)
-    networkEncoder := protocol.NewEncoder(conn)
+	rawDecoder := gob.NewDecoder(conn)
+	networkEncoder := protocol.NewEncoder(conn)
 
-    // --- Handshake (same as before) ---
-    var shake protocol.Handshake
-    if err := rawDecoder.Decode(&shake); err != nil {
-        log.Printf("Handshake failed: %v", err)
-        return
-    }
-    log.Printf("Client connected: %s", shake.ClientID)
+	// --- Handshake ---
+	var shake protocol.Handshake
+	if err := rawDecoder.Decode(&shake); err != nil {
+		log.Printf("Handshake failed from %s: %v", conn.RemoteAddr(), err)
+		return
+	}
 
-    // Register this device in the database if we haven't seen it before.
-    // In Phase 2 we'll make this a proper auth check — for now, just record it.
-    if err := database.RegisterDevice(shake.ClientID, shake.ClientID); err != nil {
-        log.Printf("Warning: could not register device %s: %v", shake.ClientID, err)
-        // We don't return here — a registration warning shouldn't kill the connection
-    }
+	// --- Phase 2 Auth: validate token against the devices table ---
+	// If the token is not registered, close the connection immediately.
+	// We do not reveal whether the token exists or why it was rejected.
+	deviceName, ok, err := database.GetDeviceName(shake.Token)
+	if err != nil {
+		log.Printf("Auth DB error for connection %s: %v", conn.RemoteAddr(), err)
+		return
+	}
+	if !ok {
+		log.Printf("Rejected connection from %s: unregistered token", conn.RemoteAddr())
+		return
+	}
+	log.Printf("Authenticated device: %s (from %s)", deviceName, conn.RemoteAddr())
 
-    // --- State variables (same as before) ---
-    var currentFile *os.File
-    var currentFileSize int64
-    var currentFileReceived int64
-    var currentPath string
-    var currentHash string // NEW: we need to remember the hash to write to DB later
+	// --- State variables ---
+	var currentFile *os.File
+	var currentFileSize int64
+	var currentFileReceived int64
+	var currentPath string
+	var currentHash string
 
-    for {
-        var p protocol.Packet
-        err := rawDecoder.Decode(&p)
-        if err != nil {
-            if currentFile != nil {
-                currentFile.Close()
-            }
-            log.Printf("Connection closed from %s: %v", shake.ClientID, err)
-            return
-        }
+	for {
+		var p protocol.Packet
+		err := rawDecoder.Decode(&p)
+		if err != nil {
+			if currentFile != nil {
+				currentFile.Close()
+			}
+			log.Printf("Connection closed from %s (%s): %v", deviceName, conn.RemoteAddr(), err)
+			return
+		}
 
-        switch p.Cmd {
+		switch p.Cmd {
 
-        case protocol.CmdPing:
-            fmt.Println("Received PING")
+		case protocol.CmdPing:
+			fmt.Println("Received PING")
 
-        // -------------------------------------------------------
-        // CmdCheckFile: "Do you need this file?"
-        // CHANGED: now checks the DATABASE instead of the filesystem
-        // -------------------------------------------------------
-        case protocol.CmdCheckFile:
-            var req protocol.CheckFileRequest
-            gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&req)
+		// -------------------------------------------------------
+		// CmdCheckFile: "Do you need this file?"
+		// Checks the database for deduplication — not the filesystem.
+		// -------------------------------------------------------
+		case protocol.CmdCheckFile:
+			var req protocol.CheckFileRequest
+			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&req)
 
-            // Ask the database: do we already have this exact file with this exact hash?
-            exists, err := database.FileExists(req.RelPath, req.Hash)
-            if err != nil {
-                // If the DB check fails, log it but tell client we need the file.
-                // It's better to receive a duplicate than to silently lose a file.
-                log.Printf("DB check error for %s: %v", req.RelPath, err)
-                exists = false
-            }
+			// Reject any path that tries to escape the vault root.
+			absRoot, _ := filepath.Abs(VaultDataPath)
+			cleanedCheck := filepath.Join(absRoot, filepath.Clean("/"+req.RelPath))
+			if !strings.HasPrefix(cleanedCheck, absRoot+string(filepath.Separator)) {
+				log.Printf("Rejected path traversal in CmdCheckFile from %s: %q", deviceName, req.RelPath)
+				continue
+			}
 
-            status := protocol.StatusNeed
-            if exists {
-                status = protocol.StatusSkip
-                fmt.Printf("⏭  Skipping %s (in database)\n", req.RelPath)
-            }
+			exists, err := database.FileExists(req.RelPath, req.Hash)
+			if err != nil {
+				// If the DB check fails, tell client we need the file.
+				// Better to receive a duplicate than to silently lose data.
+				log.Printf("DB check error for %s: %v", req.RelPath, err)
+				exists = false
+			}
 
-            // Send the response back to the client (same as before)
-            resp := protocol.FileStatusResponse{Status: uint8(status)}
-            var buf bytes.Buffer
-            gob.NewEncoder(&buf).Encode(resp)
-            networkEncoder.Encode(protocol.Packet{
-                Cmd:     protocol.CmdFileStatus,
-                Payload: buf.Bytes(),
-            })
+			status := protocol.StatusNeed
+			if exists {
+				status = protocol.StatusSkip
+				fmt.Printf("Skipping %s (in database)\n", req.RelPath)
+			}
 
-        // -------------------------------------------------------
-        // CmdSendFile: "Here comes a new file, this is its metadata"
-        // CHANGED: we now store the hash for later use in CmdFileChunk
-        // -------------------------------------------------------
-        case protocol.CmdSendFile:
-            if currentFile != nil {
-                currentFile.Close()
-            }
+			resp := protocol.FileStatusResponse{Status: uint8(status)}
+			var buf bytes.Buffer
+			gob.NewEncoder(&buf).Encode(resp)
+			networkEncoder.Encode(protocol.Packet{
+				Cmd:     protocol.CmdFileStatus,
+				Payload: buf.Bytes(),
+			})
 
-            var ft protocol.FileTransfer
-            gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&ft)
+		// -------------------------------------------------------
+		// CmdSendFile: "Here comes a new file — here's its metadata"
+		// -------------------------------------------------------
+		case protocol.CmdSendFile:
+			if currentFile != nil {
+				currentFile.Close()
+			}
 
-            // Build the destination path on disk (same as before)
-            safePath := filepath.Join(VaultDataPath, ft.RelPath)
-            os.MkdirAll(filepath.Dir(safePath), 0755)
+			var ft protocol.FileTransfer
+			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&ft)
 
-            f, err := os.Create(safePath)
-            if err != nil {
-                log.Printf("Failed to create file %s: %v", ft.RelPath, err)
-                continue
-            }
+			// Sanitize rel_path to prevent directory traversal attacks.
+			// filepath.Join + Clean collapses any ".." components, then we verify
+			// the result is still rooted inside VaultDataPath before touching disk.
+			absRoot, _ := filepath.Abs(VaultDataPath)
+			safePath := filepath.Join(absRoot, filepath.Clean("/"+ft.RelPath))
+			if !strings.HasPrefix(safePath, absRoot+string(filepath.Separator)) {
+				log.Printf("Rejected path traversal attempt from %s: %q", deviceName, ft.RelPath)
+				continue
+			}
 
-            currentFile = f
-            currentFileSize = ft.Size
-            currentFileReceived = 0
-            currentPath = ft.RelPath
-            currentHash = ft.Hash // NEW: save the hash so we can write it to the DB when done
+			os.MkdirAll(filepath.Dir(safePath), 0755)
 
-            fmt.Printf("📥 Receiving: %s (%d bytes)\n", ft.RelPath, ft.Size)
+			f, err := os.Create(safePath)
+			if err != nil {
+				log.Printf("Failed to create file %s: %v", ft.RelPath, err)
+				continue
+			}
 
-        // -------------------------------------------------------
-        // CmdFileChunk: "Here is a piece of the file"
-        // CHANGED: when the file finishes, write a record to the database
-        // -------------------------------------------------------
-        case protocol.CmdFileChunk:
-            if currentFile == nil {
-                continue
-            }
+			currentFile = f
+			currentFileSize = ft.Size
+			currentFileReceived = 0
+			currentPath = ft.RelPath
+			currentHash = ft.Hash
 
-            n, err := currentFile.Write(p.Payload)
-            if err != nil {
-                log.Printf("Write error for %s: %v", currentPath, err)
-                currentFile.Close()
-                currentFile = nil
-                continue
-            }
+			fmt.Printf("Receiving: %s (%d bytes)\n", ft.RelPath, ft.Size)
 
-            currentFileReceived += int64(n)
+		// -------------------------------------------------------
+		// CmdFileChunk: "Here is a piece of the file"
+		// Writes a chunk to disk; upserts DB record when transfer is complete.
+		// -------------------------------------------------------
+		case protocol.CmdFileChunk:
+			if currentFile == nil {
+				continue
+			}
 
-            // Progress display (same as before)
-            if currentFileSize > 0 {
-                percent := int(float64(currentFileReceived) / float64(currentFileSize) * 100)
-                if percent%10 == 0 && currentFileReceived%32768 == 0 {
-                    fmt.Printf("\r   ... %d%%", percent)
-                }
-            }
+			n, err := currentFile.Write(p.Payload)
+			if err != nil {
+				log.Printf("Write error for %s: %v", currentPath, err)
+				currentFile.Close()
+				currentFile = nil
+				continue
+			}
 
-            // --- Is the file complete? ---
-            if currentFileReceived >= currentFileSize {
-                fmt.Printf("\n✔  Saved to disk: %s\n", currentPath)
-                currentFile.Close()
-                currentFile = nil
+			currentFileReceived += int64(n)
 
-                // NEW: Write the record to the database now that the file is fully received.
-                // We do this AFTER the file is on disk, not before — if the server crashes
-                // mid-transfer, the DB record won't exist and the client will re-send it next time.
-                err := database.UpsertFile(currentPath, currentHash, shake.ClientID, currentFileReceived)
-                if err != nil {
-                    // Log the error but don't crash — the file is on disk, the DB just missed it.
-                    log.Printf("⚠️  Warning: failed to record %s in database: %v", currentPath, err)
-                } else {
-                    fmt.Printf("🗄  Recorded in database: %s\n", currentPath)
-                }
+			if currentFileSize > 0 {
+				percent := int(float64(currentFileReceived) / float64(currentFileSize) * 100)
+				if percent%10 == 0 && currentFileReceived%32768 == 0 {
+					fmt.Printf("\r   ... %d%%", percent)
+				}
+			}
 
-                // Reset state variables
-                currentPath = ""
-                currentHash = ""
-                currentFileSize = 0
-                currentFileReceived = 0
-            }
-        }
-    }
+			if currentFileReceived >= currentFileSize {
+				fmt.Printf("\nSaved to disk: %s\n", currentPath)
+				currentFile.Close()
+				currentFile = nil
+
+				// Write to DB after the file is fully on disk.
+				// If the server crashes mid-transfer, the DB record won't exist
+				// and the client will re-send the file on next sync.
+				err := database.UpsertFile(currentPath, currentHash, deviceName, currentFileReceived)
+				if err != nil {
+					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
+				} else {
+					fmt.Printf("Recorded in database: %s\n", currentPath)
+				}
+
+				currentPath = ""
+				currentHash = ""
+				currentFileSize = 0
+				currentFileReceived = 0
+			}
+		}
+	}
 }

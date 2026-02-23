@@ -218,3 +218,22 @@ func (db *DB) DeviceExists(id string) (bool, error) {
     ).Scan(&count)
     return count > 0, err
 }
+
+// GetDeviceName looks up the human-readable name for a registered token.
+// Returns ("", false, nil) if the token is not found (unregistered).
+// Returns (name, true, nil) on success.
+// Returns ("", false, err) on a database error.
+// Use this for auth checks — it combines existence check and name lookup in one query.
+func (db *DB) GetDeviceName(token string) (string, bool, error) {
+    var name string
+    err := db.conn.QueryRow(
+        `SELECT name FROM devices WHERE id = ?`, token,
+    ).Scan(&name)
+    if err == sql.ErrNoRows {
+        return "", false, nil
+    }
+    if err != nil {
+        return "", false, fmt.Errorf("get device name for token: %w", err)
+    }
+    return name, true, nil
+}
