@@ -219,6 +219,19 @@ func (db *DB) DeviceExists(id string) (bool, error) {
     return count > 0, err
 }
 
+// HashRefCount returns the number of non-deleted file rows referencing this hash.
+// Used to decide whether a blob can safely be removed from disk.
+func (db *DB) HashRefCount(hash string) (int, error) {
+    var count int
+    err := db.conn.QueryRow(
+        `SELECT COUNT(*) FROM files WHERE hash = ? AND deleted = FALSE`, hash,
+    ).Scan(&count)
+    if err != nil {
+        return 0, fmt.Errorf("hash ref count for %s: %w", hash, err)
+    }
+    return count, nil
+}
+
 // GetDeviceName looks up the human-readable name for a registered token.
 // Returns ("", false, nil) if the token is not found (unregistered).
 // Returns (name, true, nil) on success.

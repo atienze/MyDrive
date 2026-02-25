@@ -9,6 +9,7 @@ import (
 	"github.com/atienze/HomelabSecureSync/server/internal/auth"
 	"github.com/atienze/HomelabSecureSync/server/internal/db"
 	"github.com/atienze/HomelabSecureSync/server/internal/receiver"
+	"github.com/atienze/HomelabSecureSync/server/internal/store"
 )
 
 const Port = ":9000"
@@ -20,11 +21,22 @@ const Port = ":9000"
 */
 const DatabasePath = "./vaultsync.db"
 
+// VaultDataDir is the root directory for content-addressable object storage.
+// Blobs are stored at VaultDataDir/objects/{hash[:2]}/{hash[2:]}.
+const VaultDataDir = "./VaultData"
+
 func main() {
 	// Subcommand dispatch
-	if len(os.Args) >= 2 && os.Args[1] == "register" {
-		runRegister()
-		return
+	if len(os.Args) >= 2 {
+		switch os.Args[1] {
+		case "register":
+			runRegister()
+			return
+		case "migrate":
+			fmt.Fprintln(os.Stderr, "Migration is a separate binary.")
+			fmt.Fprintln(os.Stderr, "Build and run it with: go build -o vault-migrate ./server/cmd/migrate && ./vault-migrate")
+			os.Exit(1)
+		}
 	}
 	runServer()
 }
@@ -69,6 +81,15 @@ func runServer() {
 	}
 	defer database.Close()
 
+	objectStore, err := store.New(VaultDataDir)
+	if err != nil {
+		log.Fatalf("Failed to initialize object store: %v", err)
+	}
+	// Clean up any incomplete temp files from a previous crash.
+	if err := objectStore.CleanupTemp(); err != nil {
+		log.Printf("Warning: failed to clean up temp files: %v", err)
+	}
+
 	listener, err := net.Listen("tcp", Port)
 	if err != nil {
 		log.Fatalf("Failed to bind to port %s: %v", Port, err)
@@ -77,6 +98,7 @@ func runServer() {
 
 	fmt.Printf("Vault-Sync Server listening on %s\n", Port)
 	fmt.Println("Database: " + DatabasePath)
+	fmt.Println("Object store: " + VaultDataDir)
 	fmt.Println("Waiting for connections...")
 
 	for {
@@ -85,6 +107,6 @@ func runServer() {
 			log.Printf("Failed to accept connection: %v", err)
 			continue
 		}
-		go receiver.HandleConnection(conn, database)
+		go receiver.HandleConnection(conn, database, objectStore)
 	}
 }

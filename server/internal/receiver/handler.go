@@ -2,30 +2,24 @@ package receiver
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
+	"hash"
+	"io"
 	"log"
 	"net"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/atienze/HomelabSecureSync/common/protocol"
 	"github.com/atienze/HomelabSecureSync/server/internal/db"
+	"github.com/atienze/HomelabSecureSync/server/internal/store"
 )
-
-// VaultDataPath is the root folder where uploaded files are stored on disk.
-// We define it as a constant so it's easy to change in one place.
-/*
-
-"<homelab-path>/VaultData"
-
-*/
-const VaultDataPath = "./uploads"
 
 // HandleConnection validates the device token, then processes file sync commands.
 // conn is closed on return via defer — including on auth failure.
-func HandleConnection(conn net.Conn, database *db.DB) {
+func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectStore) {
 	defer conn.Close()
 	log.Printf("New connection from: %s", conn.RemoteAddr().String())
 
@@ -53,19 +47,22 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 	}
 	log.Printf("Authenticated device: %s (from %s)", deviceName, conn.RemoteAddr())
 
-	// --- State variables ---
-	var currentFile *os.File
-	var currentFileSize int64
-	var currentFileReceived int64
-	var currentPath string
-	var currentHash string
+	// --- State variables for in-progress file transfers ---
+	var currentFile *os.File       // temp file receiving chunks
+	var currentHasher hash.Hash    // streaming SHA-256 computed as chunks arrive
+	var currentFileSize int64      // declared total size
+	var currentFileReceived int64  // bytes received so far
+	var currentPath string         // client-side relative path (DB key only)
+	var currentHash string         // declared hash from the client
 
 	for {
 		var p protocol.Packet
 		err := rawDecoder.Decode(&p)
 		if err != nil {
 			if currentFile != nil {
+				tmpPath := currentFile.Name()
 				currentFile.Close()
+				os.Remove(tmpPath) // clean up incomplete transfer
 			}
 			log.Printf("Connection closed from %s (%s): %v", deviceName, conn.RemoteAddr(), err)
 			return
@@ -78,17 +75,16 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 
 		// -------------------------------------------------------
 		// CmdCheckFile: "Do you need this file?"
-		// Checks the database for deduplication — not the filesystem.
+		// Checks the database for deduplication. Also verifies
+		// that the blob actually exists on disk as a safety net.
 		// -------------------------------------------------------
 		case protocol.CmdCheckFile:
 			var req protocol.CheckFileRequest
 			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&req)
 
-			// Reject any path that tries to escape the vault root.
-			absRoot, _ := filepath.Abs(VaultDataPath)
-			cleanedCheck := filepath.Join(absRoot, filepath.Clean("/"+req.RelPath))
-			if !strings.HasPrefix(cleanedCheck, absRoot+string(filepath.Separator)) {
-				log.Printf("Rejected path traversal in CmdCheckFile from %s: %q", deviceName, req.RelPath)
+			// Validate the relative path — reject absolute paths or traversal attempts.
+			if !store.ValidateRelPath(req.RelPath) {
+				log.Printf("Rejected invalid path in CmdCheckFile from %s: %q", deviceName, req.RelPath)
 				continue
 			}
 
@@ -97,6 +93,14 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 				// If the DB check fails, tell client we need the file.
 				// Better to receive a duplicate than to silently lose data.
 				log.Printf("DB check error for %s: %v", req.RelPath, err)
+				exists = false
+			}
+
+			// Safety net: if DB says the file exists but the blob is missing
+			// from disk (corruption or manual deletion), request re-send.
+			if exists && !objectStore.HasObject(req.Hash) {
+				log.Printf("Warning: DB has %s but blob missing for hash %s, requesting re-send",
+					req.RelPath, req.Hash[:12])
 				exists = false
 			}
 
@@ -116,34 +120,33 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 
 		// -------------------------------------------------------
 		// CmdSendFile: "Here comes a new file — here's its metadata"
+		// Opens a temp file for chunk assembly and initializes the
+		// streaming hash.
 		// -------------------------------------------------------
 		case protocol.CmdSendFile:
 			if currentFile != nil {
+				tmpPath := currentFile.Name()
 				currentFile.Close()
+				os.Remove(tmpPath) // clean up previous incomplete transfer
 			}
 
 			var ft protocol.FileTransfer
 			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&ft)
 
-			// Sanitize rel_path to prevent directory traversal attacks.
-			// filepath.Join + Clean collapses any ".." components, then we verify
-			// the result is still rooted inside VaultDataPath before touching disk.
-			absRoot, _ := filepath.Abs(VaultDataPath)
-			safePath := filepath.Join(absRoot, filepath.Clean("/"+ft.RelPath))
-			if !strings.HasPrefix(safePath, absRoot+string(filepath.Separator)) {
-				log.Printf("Rejected path traversal attempt from %s: %q", deviceName, ft.RelPath)
+			// Validate the relative path.
+			if !store.ValidateRelPath(ft.RelPath) {
+				log.Printf("Rejected invalid path in CmdSendFile from %s: %q", deviceName, ft.RelPath)
 				continue
 			}
 
-			os.MkdirAll(filepath.Dir(safePath), 0755)
-
-			f, err := os.Create(safePath)
+			tmpFile, err := objectStore.CreateTempFile()
 			if err != nil {
-				log.Printf("Failed to create file %s: %v", ft.RelPath, err)
+				log.Printf("Failed to create temp file for %s: %v", ft.RelPath, err)
 				continue
 			}
 
-			currentFile = f
+			currentFile = tmpFile
+			currentHasher = sha256.New()
 			currentFileSize = ft.Size
 			currentFileReceived = 0
 			currentPath = ft.RelPath
@@ -153,17 +156,22 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 
 		// -------------------------------------------------------
 		// CmdFileChunk: "Here is a piece of the file"
-		// Writes a chunk to disk; upserts DB record when transfer is complete.
+		// Writes chunks to the temp file and the streaming hasher.
+		// On completion: verifies hash, stores object, upserts DB.
 		// -------------------------------------------------------
 		case protocol.CmdFileChunk:
 			if currentFile == nil {
 				continue
 			}
 
-			n, err := currentFile.Write(p.Payload)
+			// Write to both the temp file and the running hash simultaneously.
+			writer := io.MultiWriter(currentFile, currentHasher)
+			n, err := writer.Write(p.Payload)
 			if err != nil {
 				log.Printf("Write error for %s: %v", currentPath, err)
+				tmpPath := currentFile.Name()
 				currentFile.Close()
+				os.Remove(tmpPath)
 				currentFile = nil
 				continue
 			}
@@ -178,14 +186,39 @@ func HandleConnection(conn net.Conn, database *db.DB) {
 			}
 
 			if currentFileReceived >= currentFileSize {
-				fmt.Printf("\nSaved to disk: %s\n", currentPath)
+				tmpPath := currentFile.Name()
 				currentFile.Close()
 				currentFile = nil
 
-				// Write to DB after the file is fully on disk.
-				// If the server crashes mid-transfer, the DB record won't exist
-				// and the client will re-send the file on next sync.
-				err := database.UpsertFile(currentPath, currentHash, deviceName, currentFileReceived)
+				// Verify the hash matches what the client declared.
+				computedHash := hex.EncodeToString(currentHasher.Sum(nil))
+				if computedHash != currentHash {
+					log.Printf("Hash mismatch for %s: expected %s, got %s",
+						currentPath, currentHash[:12], computedHash[:12])
+					os.Remove(tmpPath)
+					currentPath = ""
+					currentHash = ""
+					currentFileSize = 0
+					currentFileReceived = 0
+					continue
+				}
+
+				// Move the temp file to content-addressed storage.
+				// StoreFromTemp handles dedup — if the blob already exists, the temp file is removed.
+				err := objectStore.StoreFromTemp(currentHash, tmpPath)
+				if err != nil {
+					log.Printf("Failed to store object for %s: %v", currentPath, err)
+					currentPath = ""
+					currentHash = ""
+					currentFileSize = 0
+					currentFileReceived = 0
+					continue
+				}
+
+				fmt.Printf("\nStored object: %s -> %s\n", currentPath, currentHash[:12])
+
+				// Record the path->hash mapping in the database.
+				err = database.UpsertFile(currentPath, currentHash, deviceName, currentFileReceived)
 				if err != nil {
 					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
 				} else {

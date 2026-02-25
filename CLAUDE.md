@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HomelabSecureSync (internally called "VaultSync") is a TCP-based file synchronization tool that streams files from a client machine to a homelab server. It uses SHA-256 hashing for deduplication and SQLite for file metadata tracking. The project is in active development — Phases 1–3 complete (database + hash storage), Phases 4–6 in progress (watcher, bidirectional sync, web UI).
+HomelabSecureSync (internally called "VaultSync") is a TCP-based file synchronization tool that streams files from a client machine to a homelab server. It uses SHA-256 hashing for deduplication and SQLite for file metadata tracking. The project is in active development — Phases 1–3 complete (database + hash storage), Phases 4–5 in progress (bidirectional sync, web UI). All syncing is triggered manually from the Web UI or by a poll timer — there is no filesystem watcher.
 
 ## Build & Run
 
@@ -86,16 +86,14 @@ After Phase 2, all client configuration moves to `~/.vaultsync/config.toml` (see
 |---|---|
 | `server_addr` | `<server-ip>:9000` |
 | `token` | 64-char hex string from `vault-sync-server register` |
-| `watch_dir` | `/Users/<user>/VaultDrive` |
-| `sync_interval_seconds` | `60` (default) |
+| `watch_dir` | `/Users/<user>/VaultDrive` (rename to `sync_dir` in Phase 4) |
 
 ## Planned Phases
 
 - **Phase 2**: Device Token Auth — replace hardcoded ClientID with a cryptographically random token; unregistered clients rejected at handshake
 - **Phase 3**: Hash-Based Flat Storage — transition to content-addressable storage (`objects/{hash[:2]}/{hash[2:]}`); DB becomes the sole path→content authority; identical files stored once
-- **Phase 4**: Automatic File Watching — `fsnotify`-based daemon with 500ms debouncing; deletion sync via `CmdDeleteFile`; `sync` / `daemon` subcommands; reconnecting `ConnManager`
-- **Phase 5**: Bidirectional Sync — server-to-client download; poll every `sync_interval_seconds`; echo suppression; last-write-wins conflict resolution; local `state.json`
-- **Phase 6**: Simple Web UI — `localhost:9876` dashboard; status, activity log, force-sync button; embedded HTML/CSS/JS via `//go:embed`; auto-opens browser on daemon start
+- **Phase 4**: Bidirectional Sync — server-to-client download; UI-triggered only (no poll timer); deletion detection via `state.json` comparison during full scan; last-write-wins conflict resolution; `sync` / `daemon` subcommands
+- **Phase 5**: Simple Web UI — `localhost:9876` dashboard; status, activity log, sync-now button (primary sync trigger); embedded HTML/CSS/JS via `//go:embed`; auto-opens browser on daemon start
 
 ## Phase 2 — Device Token Auth
 
@@ -112,7 +110,6 @@ After Phase 2, all client configuration moves to `~/.vaultsync/config.toml` (see
 server_addr              = "<server-ip>:9000"
 token                    = "a3f9b2c1..."
 watch_dir                = "/Users/<user>/VaultDrive"
-sync_interval_seconds    = 60
 ```
 
 ### Protocol Change
@@ -173,61 +170,7 @@ VaultData/objects/{hash[:2]}/{hash[2:]}
 - Migration script moves all existing files and creates correct DB rows
 - Migration script is idempotent
 
-## Phase 4 — Automatic File Watching
-
-### New Files
-
-| File | Purpose |
-|------|---------|
-| `client/internal/watcher/watcher.go` | `fsnotify` wrapper with 500ms debounce, recursive dir watching, ignore set |
-| `client/internal/sender/connmanager.go` | Persistent TCP connection with reconnect + exponential backoff |
-
-### New Protocol Command
-
-`CmdDeleteFile = 6` with `DeleteFileRequest{RelPath, Token}` and `DeleteFileResponse{Success, Message}`.
-
-### Watcher Behavior
-
-- Walks the tree on startup; adds every subdirectory to `fsnotify`
-- `CREATE` on a directory → `fsw.Add()` (recursive watching)
-- `WRITE`/`CREATE` on a file → debounce 500ms, then emit `EventSync`
-- `REMOVE` → cancel pending timer, immediately emit `EventDelete`
-- Ignore set: `.DS_Store`, `.swp`, `.tmp`, `~` suffix, `.vaultsync/`, `.git/`
-
-### Client Subcommands
-
-```bash
-vault-sync sync     # one-shot full scan and sync
-vault-sync daemon   # initial full sync, then watch for changes
-```
-
-### Edge Cases
-
-| Scenario | Handling |
-|----------|----------|
-| Large file being written | Debounce resets on every WRITE; syncs only when writes stop for 500ms |
-| File created then immediately deleted | DELETE cancels the pending CREATE timer |
-| Temp file renamed (`.tmp` → final name) | `.tmp` ignored; RENAME to final name triggers CREATE |
-| New directory with files | Directory CREATE adds it to fsnotify; files fire their own events |
-| Server offline | `ConnManager.Get()` returns error; log, retry with exponential backoff |
-
-### Server-Side Deletion
-
-Soft-delete in DB (`deleted = TRUE`), then call `store.DeleteObject(hash, refCount)` — only removes blob if `refCount == 0`.
-
-### Testing Checklist
-
-- Creating a file in `~/VaultDrive/` triggers automatic upload within ~1 second
-- Rapidly writing to a file triggers only one sync after completion
-- Deleting a file sends `CmdDeleteFile` and the server soft-deletes the DB row
-- Deleting a file that's the last reference to a hash removes the object blob
-- Deleting a file that shares a hash with another file does NOT remove the blob
-- Creating a new subdirectory and adding files inside it works
-- `.DS_Store`, `.swp`, `.tmp` files are ignored
-- `vault-sync daemon` runs initial full sync on startup
-- Daemon reconnects after server restart
-
-## Phase 5 — Bidirectional Sync
+## Phase 4 — Bidirectional Sync
 
 ### New Files
 
@@ -240,23 +183,36 @@ Soft-delete in DB (`deleted = TRUE`), then call `store.DeleteObject(hash, refCou
 
 | Command | Value | Direction |
 |---------|-------|-----------|
+| `CmdDeleteFile` | 6 | Client → Server |
 | `CmdListServerFiles` | 7 | Client → Server |
 | `CmdServerFileList` | 8 | Server → Client |
 | `CmdRequestFile` | 9 | Client → Server |
 | `CmdFileData` | 10 | Server → Client (chunked, same structure as upload) |
 
+`CmdDeleteFile` uses `DeleteFileRequest{RelPath, Token}` and `DeleteFileResponse{Success, Message}`. Server soft-deletes in DB (`deleted = TRUE`), then calls `store.DeleteObject(hash, refCount)` — only removes blob if `refCount == 0`.
+
+### Client Subcommands
+
+```bash
+vault-sync sync     # one-shot full scan and sync (upload + download)
+vault-sync daemon   # initial full sync, then poll timer + UI server
+```
+
 ### Sync Loop Integration
 
-Poll ticker fires every `cfg.SyncIntervalSeconds`. `PollAndDownload`:
+Sync is triggered exclusively by the "Sync Now" button in the Web UI (or the one-shot `vault-sync sync` command). There is no poll timer. Each sync cycle runs a full bidirectional sync:
+
+**Upload phase** (`FullScanAndUpload`):
+1. `scanner.ScanDirectory()` → current files on disk
+2. Compare against `state.json` to detect local deletions (file in state but not on disk → `CmdDeleteFile`)
+3. For each file on disk: `CmdCheckFile` → if needed, `CmdSendFile` + `CmdFileChunk`
+
+**Download phase** (`PollAndDownload`):
 1. Send `CmdListServerFiles`
 2. Compare response to `state.Files`
 3. Download missing/changed files via `CmdRequestFile` → `CmdFileData`
-4. Delete local files absent from the server list
+4. Delete local files absent from the server list (server-side deletions)
 5. Save `state.json`
-
-### Echo Suppression
-
-When the client writes a downloaded file, fsnotify fires. Add `suppressUntil map[string]time.Time` to `Watcher`; suppress events on a path for 5 seconds after a download.
 
 ### Conflict Resolution
 
@@ -264,15 +220,18 @@ Last-write-wins, client preference: if hashes differ, client re-uploads its vers
 
 ### Testing Checklist
 
-- File added on server appears on client within one poll interval
-- File deleted on server is deleted on client within one poll interval
-- Downloaded files don't trigger re-upload (echo suppression works)
+- `vault-sync sync` performs a complete upload + download cycle
+- File added on server appears on client after sync
+- File deleted locally is detected and `CmdDeleteFile` sent to server
+- File deleted on server is deleted on client after sync
+- Deleting a file that's the last reference to a hash removes the object blob
+- Deleting a file that shares a hash with another file does NOT remove the blob
 - Two clients registered to the same server share files bidirectionally
 - Conflicting edits resolve with client-wins behavior
 - `state.json` persists across daemon restarts
 - Initial sync on a fresh client downloads everything from the server
 
-## Phase 6 — Simple Web UI
+## Phase 5 — Simple Web UI
 
 ### New Files
 
@@ -301,7 +260,7 @@ go uiServer.Start("127.0.0.1:9876")
 exec.Command("open", "http://localhost:9876").Start() // macOS; use xdg-open on Linux
 ```
 
-`forceSyncCh` is added to the daemon's `select` loop alongside the watcher events and poll ticker.
+The daemon `select` loop listens on `forceSyncCh` only. All syncing is user-initiated via the "Sync Now" button in the UI.
 
 ### Testing Checklist
 
@@ -325,13 +284,10 @@ HomelabSecureSync/
 │   └── internal/
 │       ├── config/config.go      (TOML loader)
 │       ├── scanner/scan.go
-│       ├── sender/
-│       │   ├── client.go
-│       │   └── connmanager.go    (persistent/reconnecting connection)
+│       ├── sender/client.go
 │       ├── state/state.go        (local file state → state.json)
 │       ├── status/status.go      (shared daemon status for UI)
-│       ├── sync/bidirectional.go (poll + download)
-│       ├── watcher/watcher.go    (fsnotify + debounce + suppression)
+│       ├── sync/bidirectional.go (full scan + upload + download)
 │       └── ui/
 │           ├── server.go
 │           └── templates/dashboard.html
@@ -349,15 +305,13 @@ HomelabSecureSync/
 ## Build Order
 
 ```
-Phase 2 (Auth)           Low risk — mostly plumbing
+Phase 2 (Auth)           ✓ Complete
     ↓
-Phase 3 (Hash Storage)   Medium risk — migration required
+Phase 3 (Hash Storage)   ✓ Complete
     ↓
-Phase 4 (Watcher)        High complexity — many edge cases
+Phase 4 (Bidirectional)  Medium complexity — new data flow + deletion detection
     ↓
-Phase 5 (Bidirectional)  High complexity — new data flow direction
-    ↓
-Phase 6 (UI)             Low risk — independent of sync logic
+Phase 5 (UI)             Low risk — independent of sync logic
 ```
 
 Each phase is independently deployable.
