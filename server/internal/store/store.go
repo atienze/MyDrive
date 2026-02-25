@@ -97,9 +97,16 @@ func (s *ObjectStore) StoreFromTemp(hash string, tmpPath string) error {
 	return nil
 }
 
-// ReadObject reads the blob for the given hash from disk.
+// ReadObject reads the entire blob for the given hash into memory.
 func (s *ObjectStore) ReadObject(hash string) ([]byte, error) {
 	return os.ReadFile(s.ObjectPath(hash))
+}
+
+// OpenObject opens the blob file for streaming reads.
+// Use this instead of ReadObject for large files to avoid loading everything into memory.
+// Caller is responsible for closing the file.
+func (s *ObjectStore) OpenObject(hash string) (*os.File, error) {
+	return os.Open(s.ObjectPath(hash))
 }
 
 // DeleteObject removes the blob from disk only if refCount is 0.

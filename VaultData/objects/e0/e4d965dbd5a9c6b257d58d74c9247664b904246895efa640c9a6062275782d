@@ -1,0 +1,6 @@
+def compute_hash(data):
+    import hashlib
+    return hashlib.sha256(data).hexdigest()
+
+if __name__ == "__main__":
+    print(compute_hash(b"test"))

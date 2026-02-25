@@ -1,0 +1,4 @@
+id,name,size,hash
+1,file_a,1024,abc123
+2,file_b,2048,def456
+3,file_c,512,ghi789

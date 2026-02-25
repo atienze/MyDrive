@@ -8,10 +8,18 @@ import (
 // Commands
 const (
 	CmdPing       = 1
-	CmdSendFile   = 2 // The Header (Metadata)
-	CmdCheckFile  = 3
-	CmdFileStatus = 4
-	CmdFileChunk  = 5 // New: A piece of the file
+	CmdSendFile   = 2  // Upload file header (metadata)
+	CmdCheckFile  = 3  // Client → Server: do you need this file?
+	CmdFileStatus = 4  // Server → Client: response to CmdCheckFile
+	CmdFileChunk  = 5  // Upload file data chunk (4MB)
+
+	// Phase 4: Bidirectional sync
+	CmdDeleteFile      = 6  // Client → Server: soft-delete a file
+	CmdListServerFiles = 7  // Client → Server: request full file manifest
+	CmdServerFileList  = 8  // Server → Client: file manifest response
+	CmdRequestFile     = 9  // Client → Server: request a file download
+	CmdFileDataHeader  = 10 // Server → Client: download file metadata
+	CmdFileDataChunk   = 11 // Server → Client: download file data (4MB)
 )
 
 // Status Responses
@@ -42,6 +50,41 @@ type CheckFileRequest struct {
 // FileStatusResponse
 type FileStatusResponse struct {
 	Status uint8
+}
+
+// Phase 4: Delete
+type DeleteFileRequest struct {
+	RelPath string
+}
+
+type DeleteFileResponse struct {
+	Success bool
+	Message string
+}
+
+// Phase 4: Server file listing
+type ListServerFilesRequest struct{}
+
+type ServerFileEntry struct {
+	RelPath string
+	Hash    string
+	Size    int64
+}
+
+type ServerFileListResponse struct {
+	Files []ServerFileEntry
+}
+
+// Phase 4: File download
+type RequestFileRequest struct {
+	RelPath string
+	Hash    string
+}
+
+type FileDataHeader struct {
+	RelPath string
+	Hash    string
+	Size    int64
 }
 
 // --- Helpers (Same as before) ---

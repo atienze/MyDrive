@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaultSync Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #16213e;
+            border-bottom: 1px solid #2a2a4a;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        header .subtitle {
+            font-size: 12px;
+            color: #888;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 16px 20px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .card-detail {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .dot-green { background: #00d26a; box-shadow: 0 0 6px #00d26a88; }
+        .dot-red { background: #f24c4c; box-shadow: 0 0 6px #f24c4c88; }
+        .dot-amber { background: #f0c040; box-shadow: 0 0 6px #f0c04088; }
+
+        .actions {
+            margin-bottom: 24px;
+        }
+
+        .sync-btn {
+            background: #0f62fe;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .sync-btn:hover { background: #0043ce; }
+
+        .sync-btn:disabled {
+            background: #2a2a4a;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .error-banner {
+            background: #3a1c1c;
+            border: 1px solid #f24c4c44;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #f24c4c;
+            display: none;
+        }
+
+        .activity-section h2 {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+
+        .activity-log {
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .activity-entry {
+            padding: 10px 16px;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .activity-entry:last-child { border-bottom: none; }
+
+        .activity-time {
+            color: #666;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            white-space: nowrap;
+            min-width: 80px;
+        }
+
+        .activity-msg {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            color: #ccc;
+        }
+
+        .empty-state {
+            padding: 24px;
+            text-align: center;
+            color: #666;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>VaultSync</h1>
+            <div class="subtitle">File Sync Dashboard</div>
+        </div>
+    </header>
+
+    <main>
+        <div id="error-banner" class="error-banner"></div>
+
+        <div class="cards">
+            <div class="card">
+                <div class="card-label">Connection</div>
+                <div class="card-value">
+                    <span id="conn-dot" class="dot dot-red"></span>
+                    <span id="conn-text">Disconnected</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label">Sync Status</div>
+                <div class="card-value">
+                    <span id="sync-dot" class="dot dot-green"></span>
+                    <span id="sync-text">Idle</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label">Synced Files</div>
+                <div class="card-value" id="total-files">0</div>
+                <div class="card-detail" id="total-size">0 B</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Last Sync</div>
+                <div class="card-value" id="last-sync-time">Never</div>
+                <div class="card-detail" id="last-sync-detail"></div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="sync-btn" class="sync-btn" onclick="forceSync()">Sync Now</button>
+        </div>
+
+        <div class="activity-section">
+            <h2>Activity Log</h2>
+            <div id="activity-log" class="activity-log">
+                <div class="empty-state">No activity yet</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function timeAgo(dateStr) {
+            const now = new Date();
+            const then = new Date(dateStr);
+            const seconds = Math.floor((now - then) / 1000);
+
+            if (seconds < 5) return 'just now';
+            if (seconds < 60) return seconds + 's ago';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + 'm ago';
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + 'h ago';
+            const days = Math.floor(hours / 24);
+            return days + 'd ago';
+        }
+
+        function formatSize(bytes) {
+            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+            if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return bytes + ' B';
+        }
+
+        function formatTime(dateStr) {
+            const d = new Date(dateStr);
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function updateUI(data) {
+            // Connection status
+            const connDot = document.getElementById('conn-dot');
+            const connText = document.getElementById('conn-text');
+            connDot.className = 'dot ' + (data.connected ? 'dot-green' : 'dot-red');
+            connText.textContent = data.connected ? 'Connected' : 'Disconnected';
+
+            // Sync status
+            const syncDot = document.getElementById('sync-dot');
+            const syncText = document.getElementById('sync-text');
+            if (data.syncing) {
+                syncDot.className = 'dot dot-amber';
+                syncText.textContent = 'Syncing...';
+            } else {
+                syncDot.className = 'dot dot-green';
+                syncText.textContent = 'Idle';
+            }
+
+            // Storage stats
+            document.getElementById('total-files').textContent = data.total_files;
+            document.getElementById('total-size').textContent = formatSize(data.total_size);
+
+            // Last sync
+            const lastTime = document.getElementById('last-sync-time');
+            const lastDetail = document.getElementById('last-sync-detail');
+            if (data.last_sync_time && data.last_sync_time !== '0001-01-01T00:00:00Z') {
+                lastTime.textContent = timeAgo(data.last_sync_time);
+                lastDetail.textContent =
+                    '\u2191' + data.last_sync_uploaded +
+                    ' \u2193' + data.last_sync_downloaded +
+                    ' \u2717' + data.last_sync_deleted;
+            } else {
+                lastTime.textContent = 'Never';
+                lastDetail.textContent = '';
+            }
+
+            // Error banner
+            const banner = document.getElementById('error-banner');
+            if (data.last_sync_error) {
+                banner.textContent = data.last_sync_error;
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+
+            // Sync button
+            document.getElementById('sync-btn').disabled = data.syncing;
+
+            // Activity log
+            const log = document.getElementById('activity-log');
+            if (!data.activities || data.activities.length === 0) {
+                log.innerHTML = '<div class="empty-state">No activity yet</div>';
+            } else {
+                log.innerHTML = data.activities.map(function(a) {
+                    return '<div class="activity-entry">' +
+                        '<span class="activity-time">' + formatTime(a.time) + '</span>' +
+                        '<span class="activity-msg">' + escapeHtml(a.message) + '</span>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function fetchStatus() {
+            try {
+                const resp = await fetch('/api/status');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                updateUI(data);
+            } catch (e) {
+                // UI server itself is down — unlikely but handle gracefully
+            }
+        }
+
+        async function forceSync() {
+            document.getElementById('sync-btn').disabled = true;
+            try {
+                await fetch('/api/force-sync', { method: 'POST' });
+                // Immediately poll to show syncing state
+                setTimeout(fetchStatus, 500);
+            } catch (e) {
+                document.getElementById('sync-btn').disabled = false;
+            }
+        }
+
+        // Initial fetch + poll every 5 seconds
+        fetchStatus();
+        setInterval(fetchStatus, 5000);
+    </script>
+</body>
+</html>

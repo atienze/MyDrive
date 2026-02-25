@@ -185,8 +185,23 @@ func (db *DB) GetAllFiles() ([]FileRecord, error) {
     return files, rows.Err()
 }
 
+// GetFileHash returns the hash for a non-deleted file at the given path.
+// Returns ("", false, nil) if the file does not exist or is already deleted.
+func (db *DB) GetFileHash(relPath string) (string, bool, error) {
+	var hash string
+	err := db.conn.QueryRow(
+		`SELECT hash FROM files WHERE rel_path = ? AND deleted = FALSE`, relPath,
+	).Scan(&hash)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("get file hash for %s: %w", relPath, err)
+	}
+	return hash, true, nil
+}
+
 // MarkDeleted soft-deletes a file — we keep the record but flag it as gone.
-// We'll use this in Phase 4 when the client tells us a file was deleted.
 func (db *DB) MarkDeleted(relPath string) error {
     query := `UPDATE files SET deleted = TRUE WHERE rel_path = ?`
     _, err := db.conn.Exec(query, relPath)

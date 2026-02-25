@@ -315,3 +315,8 @@ Phase 5 (UI)             Low risk — independent of sync logic
 ```
 
 Each phase is independently deployable.
+
+
+# additional notes:
+- config.toml is exposed and should be cleaned up when im finished with implementing this program on my homelab machine
+- sqlite3 can query for my auth token as well. if someone has access to the db then they can query my key and use it to steal data. find out if theres a way to lock that functionality or even hite the id's instead. find a secure way to store it.

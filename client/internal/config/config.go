@@ -10,10 +10,9 @@ import (
 
 // Config holds all values loaded from config.toml at the project root.
 type Config struct {
-	ServerAddr          string `toml:"server_addr"`
-	Token               string `toml:"token"`
-	WatchDir            string `toml:"watch_dir"`
-	SyncIntervalSeconds int    `toml:"sync_interval_seconds"`
+	ServerAddr string `toml:"server_addr"`
+	Token      string `toml:"token"`
+	SyncDir    string `toml:"sync_dir"`
 }
 
 // ConfigPath returns the absolute path to the config file.
@@ -27,6 +26,15 @@ func ConfigPath() (string, error) {
 	// During development the binary sits at the repo root, so this resolves correctly.
 	projectRoot := filepath.Dir(exe)
 	return filepath.Join(projectRoot, "config.toml"), nil
+}
+
+// StatePath returns the path to state.json, in the same directory as config.toml.
+func StatePath() (string, error) {
+	cfgPath, err := ConfigPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(cfgPath), "state.json"), nil
 }
 
 // Load reads and parses config.toml from the project root directory.
@@ -44,15 +52,12 @@ func Load() (*Config, error) {
 				"then create %s with the printed token:\n\n"+
 				"  server_addr = \"<server-ip>:9000\"\n"+
 				"  token       = \"<64-char-token>\"\n"+
-				"  watch_dir   = \"<path-to-sync>\"",
+				"  sync_dir    = \"<path-to-sync>\"",
 			path, path,
 		)
 	}
 
-	// Apply defaults before decoding — TOML overwrites only the keys present in the file.
-	cfg := Config{
-		SyncIntervalSeconds: 60,
-	}
+	var cfg Config
 
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config at %s: %w", path, err)
@@ -64,8 +69,8 @@ func Load() (*Config, error) {
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("config: token is required")
 	}
-	if cfg.WatchDir == "" {
-		return nil, fmt.Errorf("config: watch_dir is required")
+	if cfg.SyncDir == "" {
+		return nil, fmt.Errorf("config: sync_dir is required")
 	}
 
 	return &cfg, nil

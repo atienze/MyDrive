@@ -96,10 +96,10 @@ func runServer() {
 	}
 	defer listener.Close()
 
-	fmt.Printf("Vault-Sync Server listening on %s\n", Port)
-	fmt.Println("Database: " + DatabasePath)
-	fmt.Println("Object store: " + VaultDataDir)
-	fmt.Println("Waiting for connections...")
+	log.Printf("Vault-Sync Server listening on %s", Port)
+	log.Printf("Database: %s", DatabasePath)
+	log.Printf("Object store: %s", VaultDataDir)
+	log.Println("Waiting for connections...")
 
 	for {
 		conn, err := listener.Accept()

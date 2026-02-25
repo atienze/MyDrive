@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"fmt"
 	"hash"
 	"io"
 	"log"
@@ -48,12 +47,12 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 	log.Printf("Authenticated device: %s (from %s)", deviceName, conn.RemoteAddr())
 
 	// --- State variables for in-progress file transfers ---
-	var currentFile *os.File       // temp file receiving chunks
-	var currentHasher hash.Hash    // streaming SHA-256 computed as chunks arrive
-	var currentFileSize int64      // declared total size
-	var currentFileReceived int64  // bytes received so far
-	var currentPath string         // client-side relative path (DB key only)
-	var currentHash string         // declared hash from the client
+	var currentFile *os.File      // temp file receiving chunks
+	var currentHasher hash.Hash   // streaming SHA-256 computed as chunks arrive
+	var currentFileSize int64     // declared total size
+	var currentFileReceived int64 // bytes received so far
+	var currentPath string        // client-side relative path (DB key only)
+	var currentHash string        // declared hash from the client
 
 	for {
 		var p protocol.Packet
@@ -71,7 +70,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		switch p.Cmd {
 
 		case protocol.CmdPing:
-			fmt.Println("Received PING")
+			// no-op
 
 		// -------------------------------------------------------
 		// CmdCheckFile: "Do you need this file?"
@@ -107,7 +106,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			status := protocol.StatusNeed
 			if exists {
 				status = protocol.StatusSkip
-				fmt.Printf("Skipping %s (in database)\n", req.RelPath)
+				log.Printf("Skipping %s (already stored)", req.RelPath)
 			}
 
 			resp := protocol.FileStatusResponse{Status: uint8(status)}
@@ -152,7 +151,40 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			currentPath = ft.RelPath
 			currentHash = ft.Hash
 
-			fmt.Printf("Receiving: %s (%d bytes)\n", ft.RelPath, ft.Size)
+			log.Printf("Receiving: %s (%d bytes)", ft.RelPath, ft.Size)
+
+			// Zero-byte files send no CmdFileChunk — finalize immediately.
+			if ft.Size == 0 {
+				tmpPath := currentFile.Name()
+				currentFile.Close()
+				currentFile = nil
+
+				computedHash := hex.EncodeToString(currentHasher.Sum(nil))
+				if computedHash != currentHash {
+					log.Printf("Hash mismatch for empty file %s: expected %s, got %s",
+						currentPath, currentHash[:12], computedHash[:12])
+					os.Remove(tmpPath)
+					currentPath = ""
+					currentHash = ""
+					continue
+				}
+
+				if err := objectStore.StoreFromTemp(currentHash, tmpPath); err != nil {
+					log.Printf("Failed to store empty object for %s: %v", currentPath, err)
+					currentPath = ""
+					currentHash = ""
+					continue
+				}
+				if err := database.UpsertFile(currentPath, currentHash, deviceName, 0); err != nil {
+					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
+				} else {
+					log.Printf("Stored empty file: %s -> %s", currentPath, currentHash[:12])
+				}
+				currentPath = ""
+				currentHash = ""
+				currentFileSize = 0
+				currentFileReceived = 0
+			}
 
 		// -------------------------------------------------------
 		// CmdFileChunk: "Here is a piece of the file"
@@ -177,13 +209,6 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			}
 
 			currentFileReceived += int64(n)
-
-			if currentFileSize > 0 {
-				percent := int(float64(currentFileReceived) / float64(currentFileSize) * 100)
-				if percent%10 == 0 && currentFileReceived%32768 == 0 {
-					fmt.Printf("\r   ... %d%%", percent)
-				}
-			}
 
 			if currentFileReceived >= currentFileSize {
 				tmpPath := currentFile.Name()
@@ -215,14 +240,14 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 					continue
 				}
 
-				fmt.Printf("\nStored object: %s -> %s\n", currentPath, currentHash[:12])
+				log.Printf("Stored object: %s -> %s", currentPath, currentHash[:12])
 
 				// Record the path->hash mapping in the database.
 				err = database.UpsertFile(currentPath, currentHash, deviceName, currentFileReceived)
 				if err != nil {
 					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
 				} else {
-					fmt.Printf("Recorded in database: %s\n", currentPath)
+					log.Printf("Recorded in database: %s", currentPath)
 				}
 
 				currentPath = ""
@@ -230,6 +255,162 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				currentFileSize = 0
 				currentFileReceived = 0
 			}
+
+		// -------------------------------------------------------
+		// CmdDeleteFile: Client reports a local file deletion.
+		// Soft-deletes the DB record, then removes the blob if
+		// no other files reference it.
+		// -------------------------------------------------------
+		case protocol.CmdDeleteFile:
+			var req protocol.DeleteFileRequest
+			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&req)
+
+			if !store.ValidateRelPath(req.RelPath) {
+				log.Printf("Rejected invalid path in CmdDeleteFile from %s: %q", deviceName, req.RelPath)
+				sendDeleteResponse(networkEncoder, false, "invalid path")
+				continue
+			}
+
+			// Get the hash before marking deleted (needed for blob cleanup).
+			fileHash, exists, err := database.GetFileHash(req.RelPath)
+			if err != nil {
+				log.Printf("DB error looking up %s for deletion: %v", req.RelPath, err)
+				sendDeleteResponse(networkEncoder, false, "server error")
+				continue
+			}
+			if !exists {
+				// File not found or already deleted — treat as success.
+				sendDeleteResponse(networkEncoder, true, "already deleted")
+				continue
+			}
+
+			if err := database.MarkDeleted(req.RelPath); err != nil {
+				log.Printf("Failed to mark %s as deleted: %v", req.RelPath, err)
+				sendDeleteResponse(networkEncoder, false, "server error")
+				continue
+			}
+
+			// Check if any other non-deleted files still reference this hash.
+			refCount, err := database.HashRefCount(fileHash)
+			if err != nil {
+				log.Printf("Warning: ref count check failed for hash %s: %v", fileHash[:12], err)
+			} else {
+				if err := objectStore.DeleteObject(fileHash, refCount); err != nil {
+					log.Printf("Warning: blob cleanup failed for hash %s: %v", fileHash[:12], err)
+				}
+			}
+
+			log.Printf("Deleted: %s (hash %s, refs remaining: %d)", req.RelPath, fileHash[:12], refCount)
+			sendDeleteResponse(networkEncoder, true, "deleted")
+
+		// -------------------------------------------------------
+		// CmdListServerFiles: Client requests the full file manifest.
+		// Returns ALL non-deleted files (not filtered by device)
+		// so multiple clients can share files bidirectionally.
+		// -------------------------------------------------------
+		case protocol.CmdListServerFiles:
+			files, err := database.GetAllFiles()
+			if err != nil {
+				log.Printf("Failed to list files for %s: %v", deviceName, err)
+				continue
+			}
+
+			entries := make([]protocol.ServerFileEntry, len(files))
+			for i, f := range files {
+				entries[i] = protocol.ServerFileEntry{
+					RelPath: f.RelPath,
+					Hash:    f.Hash,
+					Size:    f.Size,
+				}
+			}
+
+			var buf bytes.Buffer
+			gob.NewEncoder(&buf).Encode(protocol.ServerFileListResponse{Files: entries})
+			networkEncoder.Encode(protocol.Packet{
+				Cmd:     protocol.CmdServerFileList,
+				Payload: buf.Bytes(),
+			})
+			log.Printf("Sent file list to %s: %d files", deviceName, len(entries))
+
+		// -------------------------------------------------------
+		// CmdRequestFile: Client requests a file download.
+		// Streams the blob in 4MB chunks, mirroring the upload
+		// chunking pattern.
+		// -------------------------------------------------------
+		case protocol.CmdRequestFile:
+			var req protocol.RequestFileRequest
+			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&req)
+
+			if !store.ValidateRelPath(req.RelPath) {
+				log.Printf("Rejected invalid path in CmdRequestFile from %s: %q", deviceName, req.RelPath)
+				continue
+			}
+
+			if !objectStore.HasObject(req.Hash) {
+				log.Printf("Requested blob missing for %s (hash %s)", req.RelPath, req.Hash[:12])
+				continue
+			}
+
+			f, err := objectStore.OpenObject(req.Hash)
+			if err != nil {
+				log.Printf("Failed to open blob for %s: %v", req.RelPath, err)
+				continue
+			}
+
+			info, err := f.Stat()
+			if err != nil {
+				f.Close()
+				log.Printf("Failed to stat blob for %s: %v", req.RelPath, err)
+				continue
+			}
+
+			// Send the file metadata header.
+			header := protocol.FileDataHeader{
+				RelPath: req.RelPath,
+				Hash:    req.Hash,
+				Size:    info.Size(),
+			}
+			var hdrBuf bytes.Buffer
+			gob.NewEncoder(&hdrBuf).Encode(header)
+			networkEncoder.Encode(protocol.Packet{
+				Cmd:     protocol.CmdFileDataHeader,
+				Payload: hdrBuf.Bytes(),
+			})
+
+			// Stream the file in 4MB chunks.
+			const chunkSize = 4 * 1024 * 1024
+			chunk := make([]byte, chunkSize)
+			for {
+				n, readErr := f.Read(chunk)
+				if n > 0 {
+					networkEncoder.Encode(protocol.Packet{
+						Cmd:     protocol.CmdFileDataChunk,
+						Payload: chunk[:n],
+					})
+				}
+				if readErr == io.EOF {
+					break
+				}
+				if readErr != nil {
+					log.Printf("Read error streaming %s: %v", req.RelPath, readErr)
+					break
+				}
+			}
+			f.Close()
+			log.Printf("Sent file to %s: %s (%d bytes)", deviceName, req.RelPath, info.Size())
 		}
 	}
+}
+
+// sendDeleteResponse encodes and sends a DeleteFileResponse packet.
+func sendDeleteResponse(encoder *protocol.Encoder, success bool, message string) {
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(protocol.DeleteFileResponse{
+		Success: success,
+		Message: message,
+	})
+	encoder.Encode(protocol.Packet{
+		Cmd:     protocol.CmdDeleteFile,
+		Payload: buf.Bytes(),
+	})
 }
