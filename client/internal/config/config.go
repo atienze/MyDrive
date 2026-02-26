@@ -15,17 +15,14 @@ type Config struct {
 	SyncDir    string `toml:"sync_dir"`
 }
 
-// ConfigPath returns the absolute path to the config file.
+// ConfigPath returns the absolute path to the config file (~/.vaultsync/config.toml).
 // Exported so tests and CLI error messages can show the expected location.
 func ConfigPath() (string, error) {
-	exe, err := os.Executable()
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("could not determine executable path: %w", err)
+		return "", fmt.Errorf("could not determine home directory: %w", err)
 	}
-	// Walk up from the binary location to the project root (HomelabSecureSync).
-	// During development the binary sits at the repo root, so this resolves correctly.
-	projectRoot := filepath.Dir(exe)
-	return filepath.Join(projectRoot, "config.toml"), nil
+	return filepath.Join(home, ".vaultsync", "config.toml"), nil
 }
 
 // StatePath returns the path to state.json, in the same directory as config.toml.

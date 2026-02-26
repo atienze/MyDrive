@@ -14,16 +14,11 @@ import (
 
 const Port = ":9000"
 
-/*
-
-"<homelab-path>/vaultsync.db"
-
-*/
-const DatabasePath = "./vaultsync.db"
+var DatabasePath = "<homelab-path>/vaultsync.db"
 
 // VaultDataDir is the root directory for content-addressable object storage.
-// Blobs are stored at VaultDataDir/objects/{hash[:2]}/{hash[2:]}.
-const VaultDataDir = "./VaultData"
+// Blobs are stored at VaultData/objects/{hash[:2]}/{hash[2:]}.
+var VaultDataDir = "<homelab-path>/VaultData"
 
 func main() {
 	// Subcommand dispatch
