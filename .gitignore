@@ -1,3 +1,14 @@
 .DS_Store
 server/uploads/
 config.toml
+
+# Content-addressable object store (contains synced file blobs)
+VaultData/
+
+# SQLite databases
+*.db
+
+# Compiled binaries
+vault-sync
+vault-sync-server
+vault-migrate

@@ -74,7 +74,7 @@ After Phase 2, all client configuration moves to `~/.vaultsync/config.toml` (see
 
 | Location | Value |
 |---|---|
-| `client/cmd/main.go` | Target dir: `/Users/<user>/Desktop/TestVault` |
+| `client/cmd/main.go` | Target dir: `~/TestVault` (or configured via `~/.vaultsync/config.toml`) |
 | `client/cmd/main.go` | Server: `127.0.0.1:9000` |
 | `server/cmd/main.go` | Port: `:9000` |
 | `server/cmd/main.go` | DB path: `./vaultsync.db` |
@@ -86,7 +86,7 @@ After Phase 2, all client configuration moves to `~/.vaultsync/config.toml` (see
 |---|---|
 | `server_addr` | `<server-ip>:9000` |
 | `token` | 64-char hex string from `vault-sync-server register` |
-| `watch_dir` | `/Users/<user>/VaultDrive` (rename to `sync_dir` in Phase 4) |
+| `watch_dir` | `~/VaultDrive` (rename to `sync_dir` in Phase 4) |
 
 ## Planned Phases
 
@@ -109,7 +109,7 @@ After Phase 2, all client configuration moves to `~/.vaultsync/config.toml` (see
 ```toml
 server_addr              = "<server-ip>:9000"
 token                    = "a3f9b2c1..."
-watch_dir                = "/Users/<user>/VaultDrive"
+watch_dir                = "~/VaultDrive"
 ```
 
 ### Protocol Change

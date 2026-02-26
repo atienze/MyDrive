@@ -14,11 +14,17 @@ import (
 
 const Port = ":9000"
 
-var DatabasePath = "<homelab-path>/vaultsync.db"
+// DatabasePath and VaultDataDir can be overridden via environment variables
+// for deployment (e.g., on a homelab server). Defaults to relative paths.
+var DatabasePath = envOrDefault("VAULTSYNC_DB_PATH", "./vaultsync.db")
+var VaultDataDir = envOrDefault("VAULTSYNC_DATA_DIR", "./VaultData")
 
-// VaultDataDir is the root directory for content-addressable object storage.
-// Blobs are stored at VaultData/objects/{hash[:2]}/{hash[2:]}.
-var VaultDataDir = "<homelab-path>/VaultData"
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
 
 func main() {
 	// Subcommand dispatch
