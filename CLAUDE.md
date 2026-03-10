@@ -231,44 +231,234 @@ Last-write-wins, client preference: if hashes differ, client re-uploads its vers
 - `state.json` persists across daemon restarts
 - Initial sync on a fresh client downloads everything from the server
 
-## Phase 5 — Simple Web UI
+## Phase 5 — File Browser Web UI (OneDrive-Style)
 
-### New Files
+Phase 5 upgrades the basic status dashboard into a two-panel file browser where users can selectively push, pull, and delete files from either client or server — similar to OneDrive or Dropbox.
 
-| File | Purpose |
-|------|---------|
-| `client/internal/status/status.go` | Thread-safe `Status` struct; last 50 activity entries; `Snapshot()` for safe reads |
-| `client/internal/ui/server.go` | HTTP handlers; `//go:embed templates/*` |
-| `client/internal/ui/templates/dashboard.html` | Single-page dashboard; embedded CSS; JS auto-refresh every 5s |
+### Existing Infrastructure (Already Built)
 
-### Endpoints
+| Capability | Location | Status |
+|---|---|---|
+| All protocol commands (1–11) | `common/protocol/packet.go` | Complete |
+| Upload file (CmdSendFile + CmdFileChunk) | `client/internal/sender/client.go` | Complete |
+| Download file (CmdRequestFile → CmdFileDataHeader + CmdFileDataChunk) | `client/internal/sync/bidirectional.go` | Complete |
+| Delete from server (CmdDeleteFile) | `client/internal/sync/bidirectional.go` | Complete |
+| List server files (CmdListServerFiles → CmdServerFileList) | `client/internal/sync/bidirectional.go` | Complete |
+| Scan client files | `client/internal/scanner/scan.go` | Complete |
+| Status dashboard + activity log | `client/internal/ui/server.go` + `templates/dashboard.html` | Complete |
+| Token-based auth handshake | `common/protocol/handshake.go` | Complete |
+| Thread-safe status tracking | `client/internal/status/status.go` | Complete |
+| Local state persistence | `client/internal/state/state.go` | Complete |
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/` | GET | Render dashboard HTML |
-| `/api/status` | GET | JSON status snapshot (polled by JS) |
-| `/api/force-sync` | POST | Signal daemon to run full sync immediately |
+**Zero server-side changes needed.** All new work is client-side HTTP + UI.
 
-### Daemon Integration
+### Architecture: How Browser Talks to VaultSync Server
 
-```go
-// In client/cmd/main.go daemon case:
-appStatus    := status.New()
-forceSyncCh  := make(chan struct{}, 1)
-uiServer     := ui.NewUIServer(appStatus, forceSyncCh)
-go uiServer.Start("127.0.0.1:9876")
-exec.Command("open", "http://localhost:9876").Start() // macOS; use xdg-open on Linux
+The browser cannot speak the TCP protocol directly. The client's HTTP server (`:9876`) acts as a **proxy**: each browser action opens a fresh TCP connection to the VaultSync server (`:9000`), runs the operation, and returns JSON.
+
+```
+Browser → HTTP POST /api/files/upload?path=docs/notes.txt → UI server (localhost:9876)
+                                                                  ↓
+                                                            TCP connect to :9000
+                                                            Handshake (token auth)
+                                                            CmdSendFile + CmdFileChunk
+                                                            Close connection
+                                                                  ↓
+                                                            HTTP 200 JSON response
 ```
 
-The daemon `select` loop listens on `forceSyncCh` only. All syncing is user-initiated via the "Sync Now" button in the UI.
+This mirrors how `runSyncCycle()` in `client/cmd/main.go` already works — connect, do work, close. The difference is per-file instead of full-sync.
+
+### New/Modified Files
+
+| File | Change Type | Purpose |
+|------|-------------|---------|
+| `client/internal/sync/operations.go` | **NEW** | Extracted single-file operations: `DialAndHandshake`, `UploadSingleFile`, `DownloadSingleFile`, `DeleteServerFile`, `ListServerFiles` |
+| `client/internal/ui/server.go` | **MODIFY** | Add 6 new HTTP endpoints; accept `*config.Config`, `*state.LocalState`, `*sync.Mutex` in constructor |
+| `client/internal/ui/templates/dashboard.html` | **REWRITE** | Two-panel file browser with push/pull/delete per file |
+| `client/cmd/main.go` | **MODIFY** | Add `sync.Mutex`; pass config + state + mutex to UIServer |
+
+### New File: `client/internal/sync/operations.go`
+
+Consolidates the TCP handshake (currently duplicated between `sender/client.go` and `sync/bidirectional.go`) and exposes single-file operations callable from the UI server.
+
+```go
+package sync
+
+// DialAndHandshake opens a TCP connection and performs the auth handshake.
+// Returns (conn, encoder, decoder, error). Caller must close conn.
+func DialAndHandshake(cfg *config.Config) (net.Conn, *protocol.Encoder, *protocol.Decoder, error)
+
+// UploadSingleFile connects to the server and uploads one file.
+// Updates state on success. Uses DialAndHandshake internally.
+func UploadSingleFile(cfg *config.Config, st *state.LocalState, statePath, relPath string) error
+
+// DownloadSingleFile connects to the server and downloads one file.
+// Updates state on success. Uses DialAndHandshake internally.
+func DownloadSingleFile(cfg *config.Config, st *state.LocalState, statePath, relPath string) error
+
+// DeleteServerFile connects to the server and sends CmdDeleteFile.
+// Updates state on success. Uses DialAndHandshake internally.
+func DeleteServerFile(cfg *config.Config, st *state.LocalState, statePath, relPath string) error
+
+// FetchServerFileList connects and returns the server file manifest.
+func FetchServerFileList(cfg *config.Config) ([]protocol.ServerFileEntry, error)
+```
+
+Each function opens its own connection, does one operation, and closes. No connection pooling needed — VaultSync operations are infrequent (user-initiated).
+
+### Modified: `client/internal/ui/server.go`
+
+**Constructor change:**
+
+```go
+// Before:
+func NewUIServer(status *status.Status, forceSyncCh chan<- struct{}) *UIServer
+
+// After:
+func NewUIServer(
+    status    *status.Status,
+    forceSyncCh chan<- struct{},
+    cfg       *config.Config,
+    st        *state.LocalState,
+    statePath string,
+    syncMu    *sync.Mutex,
+) *UIServer
+```
+
+**New HTTP endpoints:**
+
+| Endpoint | Method | Purpose | Implementation |
+|----------|--------|---------|----------------|
+| `/api/files/client` | GET | List local files in `sync_dir` | `scanner.ScanDirectory(cfg.SyncDir)` |
+| `/api/files/server` | GET | List server files | `operations.FetchServerFileList(cfg)` via TCP |
+| `/api/files/upload` | POST | Push one file to server | `operations.UploadSingleFile(cfg, st, statePath, relPath)` via TCP |
+| `/api/files/download` | POST | Pull one file from server | `operations.DownloadSingleFile(cfg, st, statePath, relPath)` via TCP |
+| `/api/files/server` | DELETE | Delete file from server | `operations.DeleteServerFile(cfg, st, statePath, relPath)` via TCP |
+| `/api/files/client` | DELETE | Delete local file | `os.Remove` + `state.RemoveFile` + `state.Save` |
+
+Existing endpoints remain unchanged: `/` (dashboard), `/api/status`, `/api/force-sync`.
+
+**JSON response format for file lists:**
+
+```json
+{
+  "files": [
+    {
+      "rel_path": "documents/notes.txt",
+      "hash": "a3f9b2c1...",
+      "size": 2048,
+      "size_human": "2.0 KB"
+    }
+  ]
+}
+```
+
+The browser joins both lists client-side by `rel_path` to determine sync status per file.
+
+**All per-file endpoints acquire `syncMu.Lock()` before operating.** This prevents races with a background full sync.
+
+### Modified: `client/cmd/main.go`
+
+```go
+// In runDaemon():
+var syncMu sync.Mutex
+
+appStatus   := status.New()
+forceSyncCh := make(chan struct{}, 1)
+
+// Load state for UI server
+statePath, _ := cfg.StatePath()  // already exists
+st, _ := state.Load(statePath)
+
+uiServer := ui.NewUIServer(appStatus, forceSyncCh, cfg, st, statePath, &syncMu)
+go uiServer.Start("127.0.0.1:9876")
+
+// In main select loop, wrap sync with mutex:
+syncMu.Lock()
+doSyncCycle(cfg, appStatus)
+syncMu.Unlock()
+```
+
+### Dashboard UI: Two-Panel File Browser
+
+**Layout:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  VaultSync                    [Full Sync]     ● Connected    │
+├─────────────────────────────┬────────────────────────────────┤
+│  LOCAL (~/VaultDrive)       │  SERVER                        │
+│  ─────────────────────────  │  ────────────────────────────  │
+│  📄 docs/notes.txt    2 KB  │  📄 docs/notes.txt    2 KB     │
+│     ✓ synced                │     ✓ synced                   │
+│                             │                                │
+│  📄 photos/cat.jpg   4 MB   │  (not on server)               │
+│     [Push →]  [Delete]      │                                │
+│                             │                                │
+│  (not local)                │  📄 archive/old.zip  150 MB    │
+│                             │     [← Pull]  [Delete]         │
+│                             │                                │
+│  📄 work/report.pdf  1 MB   │  📄 work/report.pdf  1 MB      │
+│     ⚠ hash mismatch        │     ⚠ hash mismatch            │
+│     [Push →]  [Delete]      │     [← Pull]  [Delete]        │
+├─────────────────────────────┴────────────────────────────────┤
+│  Activity Log                                                │
+│  10:32:05  Uploaded docs/notes.txt (2 KB)                    │
+│  10:32:03  Downloaded archive/old.zip (150 MB)               │
+│  10:31:58  Connected to server                               │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**File states (computed client-side by joining both lists on `rel_path`):**
+
+| Client | Server | State | Actions Available |
+|--------|--------|-------|-------------------|
+| ✓ | ✓ same hash | Synced | Delete (either side) |
+| ✓ | ✓ diff hash | Conflict | Push, Pull, Delete |
+| ✓ | ✗ | Local only | Push, Delete local |
+| ✗ | ✓ | Server only | Pull, Delete server |
+
+**JS behavior:**
+- On page load and every 5s: fetch `/api/files/client` and `/api/files/server` in parallel
+- Join results by `rel_path`, compute sync state, render two-column view
+- Button clicks → `fetch()` to appropriate endpoint → refresh file lists on success
+- Disable buttons while an operation is in progress (prevent double-clicks)
+- Activity log continues polling `/api/status` for recent entries
+
+### Concurrency & Safety
+
+| Concern | Mitigation |
+|---------|------------|
+| Simultaneous UI op + full sync | `sync.Mutex` shared between daemon loop and UI handlers |
+| `state.json` concurrent writes | Mutex ensures only one sync operation at a time |
+| SQLite server-side contention | Already handled: `SetMaxOpenConns(1)` in `db/db.go` |
+| File write during download | Mutex prevents; `downloadFile()` uses atomic temp+rename anyway |
+| Browser double-click | UI disables buttons during in-flight requests |
+
+### Implementation Order
+
+1. **`client/internal/sync/operations.go`** — Extract `DialAndHandshake` from existing code; write `UploadSingleFile`, `DownloadSingleFile`, `DeleteServerFile`, `FetchServerFileList` reusing logic from `bidirectional.go` and `sender/client.go`
+2. **`client/internal/ui/server.go`** — Update constructor, add 6 new HTTP endpoints using the operations from step 1
+3. **`client/internal/ui/templates/dashboard.html`** — Rewrite to two-panel file browser; keep activity log from current dashboard
+4. **`client/cmd/main.go`** — Add `sync.Mutex`, load state, pass new deps to `NewUIServer`
 
 ### Testing Checklist
 
-- `vault-sync daemon` starts and opens `http://localhost:9876` in the browser
-- Dashboard shows current connection status
-- Dashboard updates every 5 seconds without full page reload
-- "Force Sync Now" button triggers a sync and the activity log updates
-- Recent activity shows the last 50 operations with correct relative timestamps
+- `vault-sync daemon` starts and UI loads at `http://localhost:9876`
+- `/api/files/client` returns correct file list from `sync_dir`
+- `/api/files/server` returns correct file list from VaultSync server
+- Clicking "Push" on a local-only file uploads it; file appears on server panel after refresh
+- Clicking "Pull" on a server-only file downloads it; file appears on local panel after refresh
+- Clicking "Delete" on server removes it from server; local copy unaffected
+- Clicking "Delete" on client removes local file; server copy unaffected
+- Files with matching hashes show as "synced" with no push/pull buttons
+- Files with mismatched hashes show conflict indicator with both push and pull options
+- "Full Sync" button still triggers a complete bidirectional sync
+- Activity log updates after each individual operation
+- Concurrent operations are serialized (no race conditions on `state.json`)
+- UI buttons are disabled during in-flight operations
+- Dashboard status cards (connection, sync status, file count) continue to update
 
 ## Final Project Structure
 
@@ -278,19 +468,21 @@ HomelabSecureSync/
 │   ├── crypto/hash.go
 │   └── protocol/
 │       ├── handshake.go          (Token field, Version 2)
-│       └── packet.go             (CmdPing–CmdFileData, commands 1–10)
+│       └── packet.go             (CmdPing–CmdFileDataChunk, commands 1–11)
 ├── client/
-│   ├── cmd/main.go               (sync | daemon subcommands, UI startup)
+│   ├── cmd/main.go               (sync | daemon subcommands, UI startup, sync mutex)
 │   └── internal/
 │       ├── config/config.go      (TOML loader)
 │       ├── scanner/scan.go
 │       ├── sender/client.go
 │       ├── state/state.go        (local file state → state.json)
 │       ├── status/status.go      (shared daemon status for UI)
-│       ├── sync/bidirectional.go (full scan + upload + download)
+│       ├── sync/
+│       │   ├── bidirectional.go  (full scan + upload + download)
+│       │   └── operations.go     (single-file ops: DialAndHandshake, Upload/Download/Delete/List)
 │       └── ui/
-│           ├── server.go
-│           └── templates/dashboard.html
+│           ├── server.go         (HTTP proxy: 9 endpoints, bridges browser ↔ TCP server)
+│           └── templates/dashboard.html  (two-panel file browser, OneDrive-style)
 └── server/
     ├── cmd/
     │   ├── main.go               (serve | register subcommands)
@@ -309,12 +501,16 @@ Phase 2 (Auth)           ✓ Complete
     ↓
 Phase 3 (Hash Storage)   ✓ Complete
     ↓
-Phase 4 (Bidirectional)  Medium complexity — new data flow + deletion detection
+Phase 4 (Bidirectional)  ✓ Complete — full sync with deletion detection
     ↓
-Phase 5 (UI)             Low risk — independent of sync logic
+Phase 5 (File Browser UI)  In Progress — 4 steps:
+    Step 1: sync/operations.go     (extract reusable single-file ops)
+    Step 2: ui/server.go           (add 6 HTTP endpoints)
+    Step 3: dashboard.html         (two-panel file browser)
+    Step 4: cmd/main.go            (wire sync mutex + new deps)
 ```
 
-Each phase is independently deployable.
+Each phase is independently deployable. Phase 5 requires zero server-side changes.
 
 
 # additional notes:
