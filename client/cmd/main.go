@@ -98,7 +98,7 @@ func runDaemon() {
 	// Initial sync — non-fatal on error so the daemon stays alive.
 	appStatus.AddActivity("Daemon started, running initial sync...")
 	syncMu.Lock()
-	doSyncCycle(cfg, appStatus)
+	doSyncCycle(cfg, appStatus, st, statePath)
 	syncMu.Unlock()
 
 	// Wait for force-sync triggers or shutdown signal.
@@ -110,7 +110,7 @@ func runDaemon() {
 		select {
 		case <-forceSyncCh:
 			syncMu.Lock()
-			doSyncCycle(cfg, appStatus)
+			doSyncCycle(cfg, appStatus, st, statePath)
 			syncMu.Unlock()
 		case <-sigCh:
 			fmt.Println("\nShutting down.")
@@ -119,13 +119,13 @@ func runDaemon() {
 	}
 }
 
-// doSyncCycle runs one sync cycle and updates the shared status.
+// doSyncCycle runs one sync cycle using the shared state and updates the shared status.
 // Errors are recorded in status for the UI — this function never exits the daemon.
-func doSyncCycle(cfg *config.Config, appStatus *status.Status) {
+func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalState, statePath string) {
 	appStatus.SetSyncing(true)
 	appStatus.AddActivity("Starting sync cycle...")
 
-	uploaded, downloaded, deleted, err := runSyncCycle(cfg)
+	uploaded, downloaded, deleted, err := runSyncCycleWithState(cfg, st, statePath)
 
 	appStatus.SetSyncing(false)
 	appStatus.SetLastSync(uploaded, downloaded, deleted, err)
@@ -140,21 +140,13 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status) {
 			"Sync complete: %d uploaded, %d downloaded, %d deleted",
 			uploaded, downloaded, deleted,
 		))
-		updateStorageStats(cfg, appStatus)
+		updateStorageStats(cfg, appStatus, st)
 	}
 }
 
-// updateStorageStats reads state.json and computes file count + total size.
-func updateStorageStats(cfg *config.Config, appStatus *status.Status) {
-	statePath, err := config.StatePath()
-	if err != nil {
-		return
-	}
-	st, err := state.Load(statePath)
-	if err != nil {
-		return
-	}
-
+// updateStorageStats computes file count + total size from the shared state.
+// Uses the passed *LocalState directly — no disk reload.
+func updateStorageStats(cfg *config.Config, appStatus *status.Status, st *state.LocalState) {
 	totalFiles := len(st.Files)
 	var totalSize int64
 	for relPath := range st.Files {
@@ -164,6 +156,45 @@ func updateStorageStats(cfg *config.Config, appStatus *status.Status) {
 		}
 	}
 	appStatus.SetStorageStats(totalFiles, totalSize)
+}
+
+// runSyncCycleWithState opens a connection, performs a full bidirectional sync
+// using the provided shared state, and closes. Used by the daemon to avoid
+// per-cycle state.Load() calls and prevent races with UI state mutations.
+func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath string) (uploaded, downloaded, deleted int, err error) {
+	fmt.Printf("Sync dir: %s\n", cfg.SyncDir)
+	fmt.Printf("Server:   %s\n", cfg.ServerAddr)
+
+	// Connect to the server.
+	conn, err := net.Dial("tcp", cfg.ServerAddr)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("connect to server: %w", err)
+	}
+	defer conn.Close()
+
+	encoder := gob.NewEncoder(conn)
+	decoder := protocol.NewDecoder(conn)
+
+	// Handshake.
+	shake := protocol.Handshake{
+		MagicNumber: protocol.MagicNumber,
+		Version:     protocol.Version,
+		Token:       cfg.Token,
+	}
+	if err := encoder.Encode(shake); err != nil {
+		return 0, 0, 0, fmt.Errorf("handshake: %w", err)
+	}
+
+	// Run the full bidirectional sync using the shared state.
+	start := time.Now()
+	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st)
+	uploaded, downloaded, deleted, err = syncer.RunFullSync()
+	if err != nil {
+		return uploaded, downloaded, deleted, err
+	}
+
+	fmt.Printf("Sync took %s\n", time.Since(start))
+	return uploaded, downloaded, deleted, nil
 }
 
 // runSyncCycle opens a connection, performs a full bidirectional sync, and closes.
