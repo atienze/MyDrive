@@ -3,26 +3,114 @@ package ui
 import (
 	"embed"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	stdsync "sync"
 
+	"github.com/atienze/HomelabSecureSync/client/internal/config"
+	"github.com/atienze/HomelabSecureSync/client/internal/scanner"
+	"github.com/atienze/HomelabSecureSync/client/internal/state"
 	"github.com/atienze/HomelabSecureSync/client/internal/status"
+	syncclient "github.com/atienze/HomelabSecureSync/client/internal/sync"
 )
 
 //go:embed templates/*
 var templateFS embed.FS
 
+// fileListResponse is the JSON envelope returned by the file-list endpoints.
+type fileListResponse struct {
+	Files []fileEntry `json:"files"`
+}
+
+// fileEntry is a single file record in a file-list response.
+type fileEntry struct {
+	RelPath   string `json:"rel_path"`
+	Hash      string `json:"hash"`
+	Size      int64  `json:"size"`
+	SizeHuman string `json:"size_human"`
+}
+
+// opResponse is the JSON envelope returned by mutating endpoints.
+type opResponse struct {
+	Ok      bool   `json:"ok"`
+	Message string `json:"message,omitempty"`
+}
+
+// writeJSON sets Content-Type, writes the given status code, and encodes v as JSON.
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(v)
+}
+
+// writeError writes a JSON error response using opResponse.
+func writeError(w http.ResponseWriter, code int, msg string) {
+	writeJSON(w, code, opResponse{Ok: false, Message: msg})
+}
+
+// validateRelPath returns an error if relPath is empty, starts with "/", or
+// after path.Clean would escape the root via "..".
+func validateRelPath(relPath string) error {
+	if relPath == "" {
+		return errors.New("path is required")
+	}
+	if relPath[0] == '/' {
+		return errors.New("path must not be absolute")
+	}
+	cleaned := path.Clean(relPath)
+	if len(cleaned) >= 2 && cleaned[:2] == ".." {
+		return errors.New("path traversal not allowed")
+	}
+	return nil
+}
+
+// httpStatusFromErr maps syncclient sentinel errors to appropriate HTTP status codes.
+func httpStatusFromErr(err error) int {
+	switch {
+	case errors.Is(err, syncclient.ErrServerUnreachable):
+		return http.StatusBadGateway // 502
+	case errors.Is(err, syncclient.ErrTimeout):
+		return http.StatusGatewayTimeout // 504
+	case errors.Is(err, syncclient.ErrAuthFailed):
+		return http.StatusUnauthorized // 401
+	case errors.Is(err, syncclient.ErrHashMismatch):
+		return http.StatusInternalServerError // 500
+	default:
+		return http.StatusInternalServerError // 500
+	}
+}
+
 // UIServer serves the web dashboard and exposes the status/force-sync API.
 type UIServer struct {
 	status      *status.Status
 	forceSyncCh chan<- struct{}
+	cfg         *config.Config
+	st          *state.LocalState
+	statePath   string
+	syncMu      *stdsync.Mutex
 }
 
 // NewUIServer creates a UIServer that reads from status and signals syncs on forceSyncCh.
-func NewUIServer(s *status.Status, forceSyncCh chan<- struct{}) *UIServer {
+func NewUIServer(
+	s *status.Status,
+	forceSyncCh chan<- struct{},
+	cfg *config.Config,
+	st *state.LocalState,
+	statePath string,
+	syncMu *stdsync.Mutex,
+) *UIServer {
 	return &UIServer{
 		status:      s,
 		forceSyncCh: forceSyncCh,
+		cfg:         cfg,
+		st:          st,
+		statePath:   statePath,
+		syncMu:      syncMu,
 	}
 }
 
@@ -32,6 +120,13 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("/", u.handleDashboard)
 	mux.HandleFunc("/api/status", u.handleStatus)
 	mux.HandleFunc("/api/force-sync", u.handleForceSync)
+
+	mux.HandleFunc("GET /api/files/client", u.handleClientFileList)
+	mux.HandleFunc("GET /api/files/server", u.handleServerFileList)
+	mux.HandleFunc("POST /api/files/upload", u.handleUpload)
+	mux.HandleFunc("POST /api/files/download", u.handleDownload)
+	mux.HandleFunc("DELETE /api/files/server", u.handleDeleteServer)
+	mux.HandleFunc("DELETE /api/files/client", u.handleDeleteClient)
 
 	log.Printf("UI server listening on %s", addr)
 	return http.ListenAndServe(addr, mux)
@@ -81,4 +176,146 @@ func (u *UIServer) handleForceSync(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
+}
+
+// handleClientFileList returns a JSON list of all files in the local sync directory.
+// GET /api/files/client — no mutex acquisition (read-only).
+func (u *UIServer) handleClientFileList(w http.ResponseWriter, r *http.Request) {
+	files, err := scanner.ScanDirectory(u.cfg.SyncDir)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
+		return
+	}
+
+	entries := make([]fileEntry, 0, len(files))
+	for _, f := range files {
+		entries = append(entries, fileEntry{
+			RelPath:   f.Path,
+			Hash:      f.Hash,
+			Size:      f.Size,
+			SizeHuman: status.FormatSize(f.Size),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, fileListResponse{Files: entries})
+}
+
+// handleServerFileList returns a JSON list of all files tracked on the server.
+// GET /api/files/server — no mutex acquisition (read-only).
+func (u *UIServer) handleServerFileList(w http.ResponseWriter, r *http.Request) {
+	serverFiles, err := syncclient.FetchServerFileList(u.cfg)
+	if err != nil {
+		writeError(w, httpStatusFromErr(err), fmt.Sprintf("fetch server files failed: %v", err))
+		return
+	}
+
+	entries := make([]fileEntry, 0, len(serverFiles))
+	for _, e := range serverFiles {
+		entries = append(entries, fileEntry{
+			RelPath:   e.RelPath,
+			Hash:      e.Hash,
+			Size:      e.Size,
+			SizeHuman: status.FormatSize(e.Size),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, fileListResponse{Files: entries})
+}
+
+// handleUpload pushes one local file to the server.
+// POST /api/files/upload?path=<relPath> — acquires syncMu.
+func (u *UIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	if err := validateRelPath(relPath); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	u.syncMu.Lock()
+	err := syncclient.UploadSingleFile(u.cfg, u.st, u.statePath, relPath)
+	u.syncMu.Unlock()
+
+	if err != nil {
+		u.status.AddActivity(fmt.Sprintf("Upload failed: %s: %v", relPath, err))
+		writeError(w, httpStatusFromErr(err), fmt.Sprintf("upload failed: %v", err))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Uploaded %s", relPath))
+	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "uploaded"})
+}
+
+// handleDownload pulls one file from the server to the local sync directory.
+// POST /api/files/download?path=<relPath> — acquires syncMu.
+func (u *UIServer) handleDownload(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	if err := validateRelPath(relPath); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	u.syncMu.Lock()
+	err := syncclient.DownloadSingleFile(u.cfg, u.st, u.statePath, relPath)
+	u.syncMu.Unlock()
+
+	if err != nil {
+		u.status.AddActivity(fmt.Sprintf("Download failed: %s: %v", relPath, err))
+		writeError(w, httpStatusFromErr(err), fmt.Sprintf("download failed: %v", err))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Downloaded %s", relPath))
+	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "downloaded"})
+}
+
+// handleDeleteServer soft-deletes one file from the server.
+// DELETE /api/files/server?path=<relPath> — acquires syncMu.
+func (u *UIServer) handleDeleteServer(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	if err := validateRelPath(relPath); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	u.syncMu.Lock()
+	err := syncclient.DeleteServerFile(u.cfg, u.st, u.statePath, relPath)
+	u.syncMu.Unlock()
+
+	if err != nil {
+		u.status.AddActivity(fmt.Sprintf("Server delete failed: %s: %v", relPath, err))
+		writeError(w, httpStatusFromErr(err), fmt.Sprintf("delete from server failed: %v", err))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Deleted from server: %s", relPath))
+	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "deleted from server"})
+}
+
+// handleDeleteClient removes one file from the local sync directory.
+// DELETE /api/files/client?path=<relPath> — acquires syncMu.
+func (u *UIServer) handleDeleteClient(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	if err := validateRelPath(relPath); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	fullPath := filepath.Join(u.cfg.SyncDir, relPath)
+
+	u.syncMu.Lock()
+	err := os.Remove(fullPath)
+	if err == nil {
+		u.st.RemoveFile(relPath)
+		err = u.st.Save(u.statePath)
+	}
+	u.syncMu.Unlock()
+
+	if err != nil {
+		u.status.AddActivity(fmt.Sprintf("Delete local failed: %s: %v", relPath, err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("delete local failed: %v", err))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Deleted local: %s", relPath))
+	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "deleted"})
 }

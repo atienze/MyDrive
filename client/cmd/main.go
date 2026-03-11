@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	stdsync "sync"
 	"syscall"
 	"time"
 
@@ -70,9 +71,20 @@ func runDaemon() {
 	// Shared state between the sync loop and the web UI.
 	appStatus := status.New()
 	forceSyncCh := make(chan struct{}, 1)
+	var syncMu stdsync.Mutex
+
+	// Load local state so the UI server can update it on per-file operations.
+	statePath, err := config.StatePath()
+	if err != nil {
+		log.Fatalf("Resolve state path: %v", err)
+	}
+	st, err := state.Load(statePath)
+	if err != nil {
+		log.Fatalf("Load state: %v", err)
+	}
 
 	// Start the web UI server.
-	uiServer := ui.NewUIServer(appStatus, forceSyncCh)
+	uiServer := ui.NewUIServer(appStatus, forceSyncCh, cfg, st, statePath, &syncMu)
 	go func() {
 		if err := uiServer.Start("127.0.0.1:9876"); err != nil {
 			log.Fatalf("UI server failed: %v", err)
@@ -85,7 +97,9 @@ func runDaemon() {
 
 	// Initial sync — non-fatal on error so the daemon stays alive.
 	appStatus.AddActivity("Daemon started, running initial sync...")
+	syncMu.Lock()
 	doSyncCycle(cfg, appStatus)
+	syncMu.Unlock()
 
 	// Wait for force-sync triggers or shutdown signal.
 	sigCh := make(chan os.Signal, 1)
@@ -95,7 +109,9 @@ func runDaemon() {
 	for {
 		select {
 		case <-forceSyncCh:
+			syncMu.Lock()
 			doSyncCycle(cfg, appStatus)
+			syncMu.Unlock()
 		case <-sigCh:
 			fmt.Println("\nShutting down.")
 			return
