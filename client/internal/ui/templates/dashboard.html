@@ -34,43 +34,18 @@
             color: #888;
         }
 
-        main {
-            max-width: 800px;
-            margin: 24px auto;
-            padding: 0 24px;
-        }
-
-        .cards {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+        .header-right {
+            display: flex;
+            align-items: center;
             gap: 16px;
-            margin-bottom: 24px;
         }
 
-        .card {
-            background: #16213e;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            padding: 16px 20px;
-        }
-
-        .card-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-            margin-bottom: 8px;
-        }
-
-        .card-value {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .card-detail {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #aaa;
         }
 
         .dot {
@@ -78,7 +53,6 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            margin-right: 8px;
             vertical-align: middle;
         }
 
@@ -86,21 +60,16 @@
         .dot-red { background: #f24c4c; box-shadow: 0 0 6px #f24c4c88; }
         .dot-amber { background: #f0c040; box-shadow: 0 0 6px #f0c04088; }
 
-        .actions {
-            margin-bottom: 24px;
-        }
-
         .sync-btn {
             background: #0f62fe;
             color: #fff;
             border: none;
             border-radius: 6px;
-            padding: 10px 24px;
+            padding: 8px 20px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: background 0.2s;
-            width: 100%;
         }
 
         .sync-btn:hover { background: #0043ce; }
@@ -109,6 +78,45 @@
             background: #2a2a4a;
             color: #666;
             cursor: not-allowed;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+
+        .card-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .card-detail {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
         }
 
         .error-banner {
@@ -122,8 +130,179 @@
             display: none;
         }
 
-        .activity-section h2 {
+        /* Two-panel file browser */
+        .file-browser {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .panel {
+            background: #16213e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #2a2a4a;
+            background: #1a2444;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8899bb;
+            font-weight: 600;
+        }
+
+        .panel-subtitle {
+            font-size: 11px;
+            color: #556;
+            margin-top: 2px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .file-list {
+            max-height: 480px;
+            overflow-y: auto;
+        }
+
+        .file-row {
+            padding: 10px 16px;
+            border-bottom: 1px solid #1e2a4a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+
+        .file-row:last-child { border-bottom: none; }
+        .file-row:hover { background: #1e2a4a; }
+
+        .file-icon {
             font-size: 14px;
+            flex-shrink: 0;
+            width: 18px;
+            text-align: center;
+        }
+
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-path {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #d0d8f0;
+        }
+
+        .file-meta {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        .badge-synced { background: #0d3b2e; color: #00d26a; border: 1px solid #00d26a44; }
+        .badge-conflict { background: #3b2e0d; color: #f0c040; border: 1px solid #f0c04044; }
+        .badge-local { background: #0d1e3b; color: #4d9eff; border: 1px solid #4d9eff44; }
+        .badge-server { background: #2e0d3b; color: #c080ff; border: 1px solid #c080ff44; }
+
+        .file-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .btn {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-push {
+            background: #0d2244;
+            color: #4d9eff;
+            border-color: #4d9eff44;
+        }
+        .btn-push:hover:not(:disabled) { background: #1a3366; border-color: #4d9eff; }
+
+        .btn-pull {
+            background: #2a0d44;
+            color: #c080ff;
+            border-color: #c080ff44;
+        }
+        .btn-pull:hover:not(:disabled) { background: #3a1a66; border-color: #c080ff; }
+
+        .btn-delete {
+            background: #2a0d0d;
+            color: #f24c4c;
+            border-color: #f24c4c33;
+        }
+        .btn-delete:hover:not(:disabled) { background: #3a1a1a; border-color: #f24c4c; }
+
+        .feedback-ok {
+            font-size: 11px;
+            color: #00d26a;
+            padding: 2px 0;
+        }
+
+        .feedback-err {
+            font-size: 11px;
+            color: #f24c4c;
+            padding: 2px 0;
+        }
+
+        .empty-state {
+            padding: 32px 24px;
+            text-align: center;
+            color: #556;
+            font-size: 13px;
+        }
+
+        .loading-state {
+            padding: 24px;
+            text-align: center;
+            color: #556;
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        /* Activity log */
+        .activity-section h2 {
+            font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: #888;
@@ -134,39 +313,32 @@
             background: #16213e;
             border: 1px solid #2a2a4a;
             border-radius: 8px;
-            max-height: 400px;
+            max-height: 200px;
             overflow-y: auto;
         }
 
         .activity-entry {
-            padding: 10px 16px;
-            border-bottom: 1px solid #2a2a4a;
+            padding: 8px 16px;
+            border-bottom: 1px solid #1e2a4a;
             display: flex;
             gap: 12px;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .activity-entry:last-child { border-bottom: none; }
 
         .activity-time {
-            color: #666;
+            color: #555;
             font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 12px;
+            font-size: 11px;
             white-space: nowrap;
             min-width: 80px;
         }
 
         .activity-msg {
             font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 12px;
-            color: #ccc;
-        }
-
-        .empty-state {
-            padding: 24px;
-            text-align: center;
-            color: #666;
-            font-size: 13px;
+            font-size: 11px;
+            color: #aaa;
         }
     </style>
 </head>
@@ -174,19 +346,26 @@
     <header>
         <div>
             <h1>VaultSync</h1>
-            <div class="subtitle">File Sync Dashboard</div>
+            <div class="subtitle">File Browser</div>
+        </div>
+        <div class="header-right">
+            <div class="connection-status">
+                <span id="conn-dot" class="dot dot-red"></span>
+                <span id="conn-text">Disconnected</span>
+            </div>
+            <button id="sync-btn" class="sync-btn" onclick="forceSync()">Full Sync</button>
         </div>
     </header>
 
     <main>
         <div id="error-banner" class="error-banner"></div>
 
-        <div class="cards">
+        <div class="status-cards">
             <div class="card">
                 <div class="card-label">Connection</div>
                 <div class="card-value">
-                    <span id="conn-dot" class="dot dot-red"></span>
-                    <span id="conn-text">Disconnected</span>
+                    <span id="status-conn-dot" class="dot dot-red"></span>
+                    <span id="status-conn-text">Disconnected</span>
                 </div>
             </div>
             <div class="card">
@@ -208,8 +387,28 @@
             </div>
         </div>
 
-        <div class="actions">
-            <button id="sync-btn" class="sync-btn" onclick="forceSync()">Sync Now</button>
+        <div class="file-browser">
+            <!-- Left panel: local files -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Local</div>
+                    <div class="panel-subtitle" id="local-path">~/VaultDrive</div>
+                </div>
+                <div class="file-list" id="local-file-list">
+                    <div class="loading-state">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Right panel: server files -->
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Server</div>
+                    <div class="panel-subtitle">Remote storage</div>
+                </div>
+                <div class="file-list" id="server-file-list">
+                    <div class="loading-state">Loading...</div>
+                </div>
+            </div>
         </div>
 
         <div class="activity-section">
@@ -221,19 +420,15 @@
     </main>
 
     <script>
-        function timeAgo(dateStr) {
-            const now = new Date();
-            const then = new Date(dateStr);
-            const seconds = Math.floor((now - then) / 1000);
+        // ---- global state ----
+        var operationInFlight = false;
 
-            if (seconds < 5) return 'just now';
-            if (seconds < 60) return seconds + 's ago';
-            const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return minutes + 'm ago';
-            const hours = Math.floor(minutes / 60);
-            if (hours < 24) return hours + 'h ago';
-            const days = Math.floor(hours / 24);
-            return days + 'd ago';
+        // ---- helpers ----
+
+        function escapeHtml(str) {
+            var div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
 
         function formatSize(bytes) {
@@ -243,21 +438,189 @@
             return bytes + ' B';
         }
 
+        function timeAgo(dateStr) {
+            var now = new Date();
+            var then = new Date(dateStr);
+            var seconds = Math.floor((now - then) / 1000);
+            if (seconds < 5) return 'just now';
+            if (seconds < 60) return seconds + 's ago';
+            var minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + 'm ago';
+            var hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + 'h ago';
+            return Math.floor(hours / 24) + 'd ago';
+        }
+
         function formatTime(dateStr) {
-            const d = new Date(dateStr);
+            var d = new Date(dateStr);
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        function updateUI(data) {
-            // Connection status
-            const connDot = document.getElementById('conn-dot');
-            const connText = document.getElementById('conn-text');
+        function fileIcon(relPath) {
+            var ext = relPath.split('.').pop().toLowerCase();
+            var icons = {
+                'pdf': '\uD83D\uDCCB',
+                'doc': '\uD83D\uDCDD', 'docx': '\uD83D\uDCDD',
+                'xls': '\uD83D\uDCCA', 'xlsx': '\uD83D\uDCCA',
+                'ppt': '\uD83D\uDCCA', 'pptx': '\uD83D\uDCCA',
+                'jpg': '\uD83D\uDDBC', 'jpeg': '\uD83D\uDDBC',
+                'png': '\uD83D\uDDBC', 'gif': '\uD83D\uDDBC', 'svg': '\uD83D\uDDBC',
+                'mp4': '\uD83C\uDFA5', 'mov': '\uD83C\uDFA5', 'avi': '\uD83C\uDFA5',
+                'mp3': '\uD83C\uDFB5', 'flac': '\uD83C\uDFB5', 'wav': '\uD83C\uDFB5',
+                'zip': '\uD83D\uDCE6', 'tar': '\uD83D\uDCE6', 'gz': '\uD83D\uDCE6',
+                'go': '\uD83D\uDCBB', 'js': '\uD83D\uDCBB', 'ts': '\uD83D\uDCBB',
+                'py': '\uD83D\uDCBB', 'sh': '\uD83D\uDCBB', 'rs': '\uD83D\uDCBB',
+                'txt': '\uD83D\uDCC4', 'md': '\uD83D\uDCC4', 'log': '\uD83D\uDCC4'
+            };
+            return icons[ext] || '\uD83D\uDCC4';
+        }
+
+        // ---- disable/enable all action buttons ----
+
+        function setButtonsDisabled(disabled) {
+            var btns = document.querySelectorAll('.btn');
+            btns.forEach(function(b) { b.disabled = disabled; });
+        }
+
+        // ---- file list join and render ----
+
+        function computeStatus(localMap, serverMap, relPath) {
+            var inLocal = localMap.hasOwnProperty(relPath);
+            var inServer = serverMap.hasOwnProperty(relPath);
+            if (inLocal && inServer) {
+                if (localMap[relPath].hash === serverMap[relPath].hash) {
+                    return 'synced';
+                }
+                return 'conflict';
+            }
+            if (inLocal) return 'local-only';
+            return 'server-only';
+        }
+
+        function badgeHtml(status) {
+            switch (status) {
+                case 'synced':    return '<span class="badge badge-synced">synced</span>';
+                case 'conflict':  return '<span class="badge badge-conflict">conflict</span>';
+                case 'local-only': return '<span class="badge badge-local">local only</span>';
+                case 'server-only': return '<span class="badge badge-server">server only</span>';
+            }
+            return '';
+        }
+
+        function makeBtn(cls, label, onclick) {
+            return '<button class="btn ' + cls + '" onclick="' + escapeHtml(onclick) + '">' + label + '</button>';
+        }
+
+        function renderLocalRow(f, status) {
+            var actions = '';
+            if (status === 'local-only' || status === 'conflict') {
+                actions += makeBtn('btn-push', 'Push \u2192', 'doUpload(' + JSON.stringify(f.rel_path) + ', this)');
+            }
+            actions += makeBtn('btn-delete', 'Delete', 'doDeleteClient(' + JSON.stringify(f.rel_path) + ', this)');
+
+            return '<div class="file-row">' +
+                '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
+                '<div class="file-info">' +
+                    '<div class="file-path" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
+                    '<div class="file-meta">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
+                '</div>' +
+                '<div class="file-actions">' + actions + '</div>' +
+                '</div>';
+        }
+
+        function renderServerRow(f, status) {
+            var actions = '';
+            if (status === 'server-only' || status === 'conflict') {
+                actions += makeBtn('btn-pull', '\u2190 Pull', 'doDownload(' + JSON.stringify(f.rel_path) + ', this)');
+            }
+            actions += makeBtn('btn-delete', 'Delete', 'doDeleteServer(' + JSON.stringify(f.rel_path) + ', this)');
+
+            return '<div class="file-row">' +
+                '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
+                '<div class="file-info">' +
+                    '<div class="file-path" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
+                    '<div class="file-meta">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
+                '</div>' +
+                '<div class="file-actions">' + actions + '</div>' +
+                '</div>';
+        }
+
+        function renderFileLists(clientFiles, serverFiles) {
+            // Build maps keyed by rel_path
+            var localMap = {};
+            clientFiles.forEach(function(f) { localMap[f.rel_path] = f; });
+            var serverMap = {};
+            serverFiles.forEach(function(f) { serverMap[f.rel_path] = f; });
+
+            // Collect all unique rel_paths, sorted alphabetically
+            var allPaths = Object.keys(localMap).concat(
+                Object.keys(serverMap).filter(function(p) { return !localMap.hasOwnProperty(p); })
+            ).sort();
+
+            var localHtml = '';
+            var serverHtml = '';
+
+            allPaths.forEach(function(relPath) {
+                var status = computeStatus(localMap, serverMap, relPath);
+
+                if (localMap.hasOwnProperty(relPath)) {
+                    localHtml += renderLocalRow(localMap[relPath], status);
+                }
+                if (serverMap.hasOwnProperty(relPath)) {
+                    serverHtml += renderServerRow(serverMap[relPath], status);
+                }
+            });
+
+            var localList = document.getElementById('local-file-list');
+            var serverList = document.getElementById('server-file-list');
+
+            localList.innerHTML = localHtml || '<div class="empty-state">No local files</div>';
+            serverList.innerHTML = serverHtml || '<div class="empty-state">No server files</div>';
+
+            // Re-apply disabled state if an operation is in flight
+            if (operationInFlight) {
+                setButtonsDisabled(true);
+            }
+        }
+
+        // ---- file list refresh ----
+
+        async function refreshFileLists() {
+            try {
+                var results = await Promise.all([
+                    fetch('/api/files/client').then(function(r) { return r.json(); }),
+                    fetch('/api/files/server').then(function(r) { return r.json(); })
+                ]);
+                var clientFiles = (results[0].files || []).slice().sort(function(a, b) {
+                    return a.rel_path < b.rel_path ? -1 : a.rel_path > b.rel_path ? 1 : 0;
+                });
+                var serverFiles = (results[1].files || []).slice().sort(function(a, b) {
+                    return a.rel_path < b.rel_path ? -1 : a.rel_path > b.rel_path ? 1 : 0;
+                });
+                renderFileLists(clientFiles, serverFiles);
+            } catch (e) {
+                // Silently ignore network errors during polling
+            }
+        }
+
+        // ---- status polling ----
+
+        function updateStatus(data) {
+            // Header connection dot
+            var connDot = document.getElementById('conn-dot');
+            var connText = document.getElementById('conn-text');
             connDot.className = 'dot ' + (data.connected ? 'dot-green' : 'dot-red');
             connText.textContent = data.connected ? 'Connected' : 'Disconnected';
 
-            // Sync status
-            const syncDot = document.getElementById('sync-dot');
-            const syncText = document.getElementById('sync-text');
+            // Status card: connection
+            var scDot = document.getElementById('status-conn-dot');
+            var scText = document.getElementById('status-conn-text');
+            scDot.className = 'dot ' + (data.connected ? 'dot-green' : 'dot-red');
+            scText.textContent = data.connected ? 'Connected' : 'Disconnected';
+
+            // Status card: sync status
+            var syncDot = document.getElementById('sync-dot');
+            var syncText = document.getElementById('sync-text');
             if (data.syncing) {
                 syncDot.className = 'dot dot-amber';
                 syncText.textContent = 'Syncing...';
@@ -271,8 +634,8 @@
             document.getElementById('total-size').textContent = formatSize(data.total_size);
 
             // Last sync
-            const lastTime = document.getElementById('last-sync-time');
-            const lastDetail = document.getElementById('last-sync-detail');
+            var lastTime = document.getElementById('last-sync-time');
+            var lastDetail = document.getElementById('last-sync-detail');
             if (data.last_sync_time && data.last_sync_time !== '0001-01-01T00:00:00Z') {
                 lastTime.textContent = timeAgo(data.last_sync_time);
                 lastDetail.textContent =
@@ -285,7 +648,7 @@
             }
 
             // Error banner
-            const banner = document.getElementById('error-banner');
+            var banner = document.getElementById('error-banner');
             if (data.last_sync_error) {
                 banner.textContent = data.last_sync_error;
                 banner.style.display = 'block';
@@ -293,11 +656,11 @@
                 banner.style.display = 'none';
             }
 
-            // Sync button
+            // Full sync button: disabled while syncing
             document.getElementById('sync-btn').disabled = data.syncing;
 
             // Activity log
-            const log = document.getElementById('activity-log');
+            var log = document.getElementById('activity-log');
             if (!data.activities || data.activities.length === 0) {
                 log.innerHTML = '<div class="empty-state">No activity yet</div>';
             } else {
@@ -310,37 +673,161 @@
             }
         }
 
-        function escapeHtml(str) {
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
-
         async function fetchStatus() {
             try {
-                const resp = await fetch('/api/status');
+                var resp = await fetch('/api/status');
                 if (!resp.ok) return;
-                const data = await resp.json();
-                updateUI(data);
+                var data = await resp.json();
+                updateStatus(data);
             } catch (e) {
-                // UI server itself is down — unlikely but handle gracefully
+                // UI server itself is down — handle gracefully
             }
         }
+
+        // ---- per-file operations ----
+
+        // Show inline feedback on the row containing the clicked button
+        function showFeedback(btn, msg, isError) {
+            var row = btn.closest('.file-row');
+            if (!row) return;
+            var existing = row.querySelector('.feedback-ok, .feedback-err');
+            if (existing) existing.remove();
+            var span = document.createElement('span');
+            span.className = isError ? 'feedback-err' : 'feedback-ok';
+            span.textContent = msg;
+            var actions = row.querySelector('.file-actions');
+            if (actions) actions.appendChild(span);
+            // Auto-remove after 3s
+            setTimeout(function() { if (span.parentNode) span.remove(); }, 3000);
+        }
+
+        async function doUpload(relPath, btn) {
+            if (operationInFlight) return;
+            operationInFlight = true;
+            var origText = btn.textContent;
+            btn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var resp = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), { method: 'POST' });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(btn, 'Pushed', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(btn, data.message || 'Upload failed', true);
+                }
+            } catch (e) {
+                showFeedback(btn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                btn.textContent = origText;
+                setButtonsDisabled(false);
+            }
+        }
+
+        async function doDownload(relPath, btn) {
+            if (operationInFlight) return;
+            operationInFlight = true;
+            var origText = btn.textContent;
+            btn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var resp = await fetch('/api/files/download?path=' + encodeURIComponent(relPath), { method: 'POST' });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(btn, 'Pulled', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(btn, data.message || 'Download failed', true);
+                }
+            } catch (e) {
+                showFeedback(btn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                btn.textContent = origText;
+                setButtonsDisabled(false);
+            }
+        }
+
+        async function doDeleteServer(relPath, btn) {
+            if (operationInFlight) return;
+            if (!confirm('Delete "' + relPath + '" from server?')) return;
+            operationInFlight = true;
+            var origText = btn.textContent;
+            btn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var resp = await fetch('/api/files/server?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(btn, 'Deleted', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(btn, data.message || 'Delete failed', true);
+                }
+            } catch (e) {
+                showFeedback(btn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                btn.textContent = origText;
+                setButtonsDisabled(false);
+            }
+        }
+
+        async function doDeleteClient(relPath, btn) {
+            if (operationInFlight) return;
+            if (!confirm('Delete "' + relPath + '" from local storage?')) return;
+            operationInFlight = true;
+            var origText = btn.textContent;
+            btn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var resp = await fetch('/api/files/client?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(btn, 'Deleted', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(btn, data.message || 'Delete failed', true);
+                }
+            } catch (e) {
+                showFeedback(btn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                btn.textContent = origText;
+                setButtonsDisabled(false);
+            }
+        }
+
+        // ---- force sync ----
 
         async function forceSync() {
             document.getElementById('sync-btn').disabled = true;
             try {
                 await fetch('/api/force-sync', { method: 'POST' });
-                // Immediately poll to show syncing state
-                setTimeout(fetchStatus, 500);
+                // Poll immediately to show syncing state, then refresh file lists
+                setTimeout(async function() {
+                    await fetchStatus();
+                    await refreshFileLists();
+                }, 500);
             } catch (e) {
                 document.getElementById('sync-btn').disabled = false;
             }
         }
 
-        // Initial fetch + poll every 5 seconds
-        fetchStatus();
-        setInterval(fetchStatus, 5000);
+        // ---- combined poll ----
+
+        async function poll() {
+            await Promise.all([fetchStatus(), refreshFileLists()]);
+        }
+
+        // Initial load + 5s polling
+        poll();
+        setInterval(poll, 5000);
     </script>
 </body>
 </html>
