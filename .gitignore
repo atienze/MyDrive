@@ -12,3 +12,6 @@ VaultData/
 vault-sync
 vault-sync-server
 vault-migrate
+
+# Planning docs (local-only)
+.planning/
