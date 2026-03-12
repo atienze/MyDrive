@@ -8,10 +8,10 @@ import (
 // Commands
 const (
 	CmdPing       = 1
-	CmdSendFile   = 2  // Upload file header (metadata)
-	CmdCheckFile  = 3  // Client → Server: do you need this file?
-	CmdFileStatus = 4  // Server → Client: response to CmdCheckFile
-	CmdFileChunk  = 5  // Upload file data chunk (4MB)
+	CmdSendFile   = 2 // Upload file header (metadata)
+	CmdCheckFile  = 3 // Client → Server: do you need this file?
+	CmdFileStatus = 4 // Server → Client: response to CmdCheckFile
+	CmdFileChunk  = 5 // Upload file data chunk (4MB)
 
 	// Phase 4: Bidirectional sync
 	CmdDeleteFile      = 6  // Client → Server: soft-delete a file

@@ -1,6 +1,0 @@
-server:
-  host: 127.0.0.1
-  port: 9000
-client:
-  sync_dir: /TestVault
-  chunk_size: 4194304
