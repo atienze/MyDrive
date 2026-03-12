@@ -428,7 +428,7 @@
         function escapeHtml(str) {
             var div = document.createElement('div');
             div.textContent = str;
-            return div.innerHTML;
+            return div.innerHTML.replace(/"/g, '&quot;');
         }
 
         function formatSize(bytes) {
@@ -507,16 +507,16 @@
             return '';
         }
 
-        function makeBtn(cls, label, onclick) {
-            return '<button class="btn ' + cls + '" onclick="' + escapeHtml(onclick) + '">' + label + '</button>';
+        function makeBtn(cls, label, action, relPath) {
+            return '<button class="btn ' + cls + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '">' + label + '</button>';
         }
 
         function renderLocalRow(f, status) {
             var actions = '';
             if (status === 'local-only' || status === 'conflict') {
-                actions += makeBtn('btn-push', 'Push \u2192', 'doUpload(' + JSON.stringify(f.rel_path) + ', this)');
+                actions += makeBtn('btn-push', 'Push \u2192', 'upload', f.rel_path);
             }
-            actions += makeBtn('btn-delete', 'Delete', 'doDeleteClient(' + JSON.stringify(f.rel_path) + ', this)');
+            actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
 
             return '<div class="file-row">' +
                 '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
@@ -531,9 +531,9 @@
         function renderServerRow(f, status) {
             var actions = '';
             if (status === 'server-only' || status === 'conflict') {
-                actions += makeBtn('btn-pull', '\u2190 Pull', 'doDownload(' + JSON.stringify(f.rel_path) + ', this)');
+                actions += makeBtn('btn-pull', '\u2190 Pull', 'download', f.rel_path);
             }
-            actions += makeBtn('btn-delete', 'Delete', 'doDeleteServer(' + JSON.stringify(f.rel_path) + ', this)');
+            actions += makeBtn('btn-delete', 'Delete', 'delete-server', f.rel_path);
 
             return '<div class="file-row">' +
                 '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
@@ -803,6 +803,21 @@
             }
         }
 
+        // ---- delegated click handler for file action buttons ----
+
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.btn[data-action]');
+            if (!btn) return;
+            var action = btn.dataset.action;
+            var path = btn.dataset.path;
+            switch (action) {
+                case 'upload':       doUpload(path, btn); break;
+                case 'download':     doDownload(path, btn); break;
+                case 'delete-client': doDeleteClient(path, btn); break;
+                case 'delete-server': doDeleteServer(path, btn); break;
+            }
+        });
+
         // ---- force sync ----
 
         async function forceSync() {
@@ -821,13 +836,20 @@
 
         // ---- combined poll ----
 
-        async function poll() {
-            await Promise.all([fetchStatus(), refreshFileLists()]);
+        // ---- polling ----
+        // Status polling: lightweight, local HTTP only (no TCP to server)
+        // File list refresh: only on load and after operations (avoids TCP spam)
+
+        async function pollStatus() {
+            if (operationInFlight) return;
+            await fetchStatus();
         }
 
-        // Initial load + 5s polling
-        poll();
-        setInterval(poll, 5000);
+        // Initial load: fetch both status and file lists once
+        fetchStatus();
+        refreshFileLists();
+        // Only poll status on the timer — file lists refresh after operations
+        setInterval(pollStatus, 5000);
     </script>
 </body>
 </html>

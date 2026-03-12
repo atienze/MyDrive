@@ -1,221 +1,134 @@
-# External Integrations
+# Integrations
 
-**Analysis Date:** 2026-03-11
+## External Services
 
-## APIs & External Services
+**None.** HomelabSecureSync is a self-contained homelab tool with no external API calls, cloud services, or third-party integrations.
 
-**None Detected:**
-- This is an internal, self-contained file synchronization system
-- No third-party APIs (Stripe, AWS, etc.) are integrated
-- No webhooks to external services
-- Entirely on-premises: client-server TCP communication only
+## Database — SQLite
 
-## Data Storage
+**Driver:** `modernc.org/sqlite` v1.46.1 (pure Go, no CGO)
+**Location:** `server/internal/db/db.go`
+**File:** Configured via `VAULTSYNC_DB_PATH` env var (default `./vaultsync.db`)
 
-**Databases:**
-- SQLite 3 (pure-Go via `modernc.org/sqlite`)
-  - Location: `./vaultsync.db` (configurable: `VAULTSYNC_DB_PATH`)
-  - Client: Direct Go `database/sql` with modernc.org/sqlite driver
-  - Connection: Single persistent connection (intentional, no pooling)
-  - Tables:
-    - `files` (rel_path, hash, size, device_id, uploaded_at, deleted)
-    - `devices` (id, name, token, created_at)
+### Schema
 
-**File Storage:**
-- Local filesystem only (on server)
-  - Type: Content-addressable object store
-  - Path: `./VaultData/objects/{hash[:2]}/{hash[2:]}` (configurable: `VAULTSYNC_DATA_DIR`)
-  - Format: Raw binary files, deduplicated by SHA-256
-  - Temporary storage: `./VaultData/tmp/` (auto-cleaned on server startup)
+```sql
+CREATE TABLE devices (
+    id         TEXT PRIMARY KEY,           -- 64-char hex token (crypto/rand)
+    name       TEXT NOT NULL,              -- device name ("MacBook-Pro")
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
-**Caching:**
-- None - no external caching layer (Redis, Memcached)
-- In-memory: Connection handles, file buffers during transfers (4 MB chunks)
-
-## Authentication & Identity
-
-**Auth Provider:**
-- Custom token-based system (no OAuth, no LDAP)
-  - Implementation: `server/internal/auth/register.go` generates 256-bit random tokens
-  - Token format: 64-character hexadecimal string
-  - Issued by: Server subcommand `vault-sync-server register "DeviceName"`
-  - Validation: Token queried against `devices` table on handshake
-  - Plaintext storage in SQLite (see security concerns in CLAUDE.md)
-
-**Protocol:**
-- Binary TCP handshake (`common/protocol/handshake.go`)
-  - Magic number: `0xCAFEBABE` (validation)
-  - Version: 2 (token-based, replaces v1 ClientID)
-  - Token field: 64-char hex string from config
-  - Authentication failure → immediate connection drop (no retry)
-
-**Client Configuration:**
-- TOML file: `~/.vaultsync/config.toml`
-  - Fields: `server_addr`, `token`, `sync_dir`
-  - Loaded at startup via `client/internal/config/config.go`
-  - Missing config → fatal error with actionable instructions
-
-## Monitoring & Observability
-
-**Error Tracking:**
-- None - no Sentry, CloudWatch, or external error logging service
-
-**Logs:**
-- Approach: Go standard library `log` package
-  - Server logs: `log.Printf()` to stderr
-    - Connection events, device registration, sync activity
-    - File I/O errors, database errors
-  - Client logs: `log.Fatalf()` for fatal errors, `log.Printf()` for info
-  - UI activity log: In-memory status tracker (`client/internal/status/status.go`)
-    - JSON endpoint: `/api/status` (recent 20 activities)
-    - Dashboard refreshes every 5 seconds
-
-**No external collectors:** Logs stay local to running process
-
-## CI/CD & Deployment
-
-**Hosting:**
-- Self-hosted homelab server (no cloud provider required)
-- No container orchestration: raw binary execution
-- Docker support: Not configured (docker-compose.yml is empty)
-
-**CI Pipeline:**
-- None detected - no GitHub Actions, GitLab CI, or Jenkins
-- Manual local testing with `go test ./...`
-
-**Deployment Model:**
-- Direct binary execution on homelab server
-- Configuration via environment variables:
-  - `VAULTSYNC_DB_PATH` - Database location
-  - `VAULTSYNC_DATA_DIR` - Object store location
-- No systemd service templates or supervisor configs included
-
-## Environment Configuration
-
-**Required env vars (for server deployment):**
-- `VAULTSYNC_DB_PATH` (optional, default: `./vaultsync.db`)
-- `VAULTSYNC_DATA_DIR` (optional, default: `./VaultData`)
-
-**Client env vars:**
-- None required - all config via `~/.vaultsync/config.toml`
-
-**Secrets location:**
-- Server: Device tokens stored plaintext in SQLite `devices` table
-  - Security risk noted in CLAUDE.md ("token as plaintext in db")
-  - Recommendation: Consider token hashing or secure enclave before homelab deploy
-- Client: Token stored plaintext in `~/.vaultsync/config.toml`
-  - Must protect file permissions: `chmod 600 ~/.vaultsync/config.toml`
-
-## Webhooks & Callbacks
-
-**Incoming:**
-- None - server does not accept webhooks
-
-**Outgoing:**
-- None - client does not post to external services
-- Internal only: HTTP callbacks within UI server (`:9876` → `:9000` TCP for operations)
-
-## Data Flow & Integration Points
-
-**Client → Server:**
-```
-Browser (localhost:9876)
-    ↓ HTTP (vanilla JS fetch)
-UI Server (localhost:9876)
-    ↓ TCP connection
-Server (:9000)
-    ↓ Query/Insert
-SQLite database + Object store
+CREATE TABLE files (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rel_path    TEXT NOT NULL UNIQUE,      -- "Documents/resume.pdf"
+    hash        TEXT NOT NULL,             -- SHA-256 hex (64 chars)
+    size        INTEGER NOT NULL,
+    device_id   TEXT NOT NULL,             -- token of uploading device
+    uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted     BOOLEAN DEFAULT FALSE      -- soft-delete flag
+);
 ```
 
-**Server → Client (downloads):**
-```
-Browser (localhost:9876)
-    ↓ HTTP /api/files/download?path=...
-UI Server (localhost:9876)
-    ↓ TCP CmdRequestFile + CmdFileData chunks
-Server (:9000)
-    ↓ Read from object store
-SQLite + Object store
-```
+### Key Operations
 
-**File Operations:**
-- Upload: Client scans local `sync_dir` → computes SHA-256 → streams chunks to server
-- Download: Client requests files → server reads from object store → client writes to disk
-- Deduplication: Before writing, server checks if hash exists in `files` table + object store
-- Deletion: Client sends CmdDeleteFile → server soft-deletes in DB → removes object blob if no other references
+| Method | SQL | Purpose |
+|--------|-----|---------|
+| `FileExists(path, hash)` | `SELECT id FROM files WHERE rel_path=? AND hash=? AND deleted=FALSE` | Dedup check |
+| `UpsertFile(path, hash, device, size)` | `INSERT ... ON CONFLICT(rel_path) DO UPDATE` | Create/update file record |
+| `GetAllFiles()` | `SELECT rel_path, hash, size FROM files WHERE deleted=FALSE` | Server manifest |
+| `GetFileHash(path)` | `SELECT hash FROM files WHERE rel_path=? AND deleted=FALSE` | Lookup for download/delete |
+| `MarkDeleted(path)` | `UPDATE files SET deleted=TRUE WHERE rel_path=?` | Soft-delete |
+| `HashRefCount(hash)` | `SELECT COUNT(*) FROM files WHERE hash=? AND deleted=FALSE` | Safe blob deletion check |
+| `RegisterDevice(token, name)` | `INSERT INTO devices(id, name)` | Token registration |
+| `GetDeviceName(token)` | `SELECT name FROM devices WHERE id=?` | Auth lookup |
 
-## Client-Server Communication Protocol
+**Concurrency:** `SetMaxOpenConns(1)` — single writer prevents SQLite lock contention across goroutines.
 
-**Binary Protocol (Go gob-encoded):**
-- No REST API, no JSON at TCP level
-- Packet structure:
-  ```
-  Cmd (uint8) | Payload (gob-encoded struct)
-  ```
-- Commands (1-11):
-  1. CmdPing - Keep-alive
-  2. CmdSendFile - Upload file metadata
-  3. CmdCheckFile - Query if file exists
-  4. CmdFileStatus - Response (Need/Skip)
-  5. CmdFileChunk - Upload file data (4 MB chunks)
-  6. CmdDeleteFile - Soft-delete on server
-  7. CmdListServerFiles - Request manifest
-  8. CmdServerFileList - File manifest response
-  9. CmdRequestFile - Download request
-  10. CmdFileDataHeader - Download metadata
-  11. CmdFileDataChunk - Download data (4 MB chunks)
+## TCP Protocol (Custom Binary)
 
-**HTTP API (Client UI only):**
-- GET `/` - Dashboard HTML
-- GET `/api/status` - Current sync status + activity log (JSON)
-- POST `/api/force-sync` - Trigger immediate sync
-- GET `/api/files/client` - List local files (Phase 5)
-- GET `/api/files/server` - List server files (Phase 5)
-- POST `/api/files/upload` - Push single file (Phase 5)
-- POST `/api/files/download` - Pull single file (Phase 5)
-- DELETE `/api/files/server` - Delete from server (Phase 5)
-- DELETE `/api/files/client` - Delete locally (Phase 5)
+**Port:** 9000
+**Encoding:** Go `encoding/gob`
+**Location:** `common/protocol/`
 
-## State Persistence
+### Handshake
 
-**Client State File:**
-- Format: JSON
-- Location: `~/.vaultsync/state.json` (derived from config path)
-- Purpose: Track uploaded files' hashes locally for change detection
-- Lifecycle:
-  - Created on first sync
-  - Updated after each successful sync
-  - Used to detect local deletions (file in state but not on disk)
-
-**Server State:**
-- No persistent state files - all state in SQLite
-- Database is the source of truth for:
-  - Which files exist (rel_path → hash mapping)
-  - Which devices are registered
-  - Deduplication info (blob refcounts, if tracked)
-
-## Physical Data Flow
-
-```
-Client Machine                      Server (Homelab)
-─────────────────                   ───────────────
-sync_dir (local files)
-    ↓
-state.json (local tracking)
-    ↓
-config.toml (server address + token)
-    ↓ TCP port 9000 (encrypted by firewall, not by app)
-                                    vaultsync.db (SQLite)
-                                    VaultData/objects/ (blobs)
-                                    VaultData/tmp/ (temp)
+```go
+type Handshake struct {
+    MagicNumber uint32 // 0xCAFEBABE
+    Version     uint8  // 2
+    Token       string // 64-char hex
+}
 ```
 
-**No encryption:** TCP stream is cleartext. Security relies on:
-- Network isolation (homelab only)
-- Token-based authentication (prevents unauthorized access)
-- Firewall rules (restrict port 9000 access)
+### Commands (1–11)
 
----
+| Cmd | Name | Direction | Payload | Purpose |
+|-----|------|-----------|---------|---------|
+| 1 | CmdPing | C→S | — | Keepalive |
+| 2 | CmdSendFile | C→S | `FileTransfer{RelPath, Hash, Size}` | Upload header |
+| 3 | CmdCheckFile | C→S | `CheckFileRequest{RelPath, Hash}` | Dedup check |
+| 4 | CmdFileStatus | S→C | `FileStatusResponse{Status}` | Need(1) or Skip(2) |
+| 5 | CmdFileChunk | C→S | `[]byte` | 4MB upload chunk |
+| 6 | CmdDeleteFile | C→S | `DeleteFileRequest{RelPath}` | Server soft-delete |
+| 7 | CmdListServerFiles | C→S | `ListServerFilesRequest{Token}` | Request manifest |
+| 8 | CmdServerFileList | S→C | `ServerFileListResponse{Files}` | File manifest |
+| 9 | CmdRequestFile | C→S | `RequestFileRequest{RelPath, Hash}` | Request download |
+| 10 | CmdFileDataHeader | S→C | `FileDataHeader{RelPath, Hash, Size}` | Download header |
+| 11 | CmdFileDataChunk | S→C | `[]byte` | 4MB download chunk |
 
-*Integration audit: 2026-03-11*
+**Chunk size:** 4 MB (`4 * 1024 * 1024`)
+
+## HTTP API (Web UI)
+
+**Port:** 9876 (localhost only)
+**Location:** `client/internal/ui/server.go`
+**Template:** `client/internal/ui/templates/dashboard.html` (embedded via `//go:embed`)
+
+### Endpoints
+
+| Method | Path | Purpose | Acquires Mutex |
+|--------|------|---------|----------------|
+| GET | `/` | Dashboard HTML | No |
+| GET | `/api/status` | Daemon status JSON | No |
+| POST | `/api/force-sync` | Trigger full sync cycle | No (signals channel) |
+| GET | `/api/files/client` | Local file list | No |
+| GET | `/api/files/server` | Server file list via TCP | No |
+| POST | `/api/files/upload?path=` | Push file to server | Yes |
+| POST | `/api/files/download?path=` | Pull file from server | Yes |
+| DELETE | `/api/files/server?path=` | Delete from server | Yes |
+| DELETE | `/api/files/client?path=` | Delete local file | Yes |
+
+### Error Handling
+
+Sentinel errors mapped to HTTP status codes via `httpStatusFromErr()`:
+
+| Error | HTTP Status |
+|-------|-------------|
+| `ErrServerUnreachable` | 502 Bad Gateway |
+| `ErrAuthFailed` | 502 Bad Gateway |
+| `ErrTimeout` | 504 Gateway Timeout |
+| `ErrHashMismatch` | 500 Internal Server Error |
+| Other | 500 Internal Server Error |
+
+## Authentication
+
+**Mechanism:** Pre-shared token (64-char hex)
+**Registration:** `vault-sync-server register "DeviceName"` → generates token via `crypto/rand`, stores in `devices` table, prints once
+**Auth flow:** Client includes token in TCP handshake → server looks up `devices.id` → match continues, mismatch closes connection
+**No TLS:** All traffic is plaintext (homelab trusted network assumption)
+
+## File Storage — Content-Addressed
+
+**Location:** `server/internal/store/store.go`
+**Root:** Configured via `VAULTSYNC_DATA_DIR` (default `./VaultData`)
+
+```
+VaultData/
+├── objects/{hash[:2]}/{hash[2:]}   # blob storage
+└── tmp/{uuid}                       # in-progress transfers
+```
+
+- **Dedup:** Same hash = same blob, regardless of path or device
+- **Safe delete:** `DeleteObject(hash, refCount)` — only removes blob if refCount == 0
+- **Atomic writes:** temp file → rename to final path

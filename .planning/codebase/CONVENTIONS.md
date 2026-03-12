@@ -1,249 +1,156 @@
-# Coding Conventions
-
-**Analysis Date:** 2025-03-11
-
-## Naming Patterns
-
-**Files:**
-- Package names: lowercase single word (`scanner`, `store`, `sender`, `config`, `status`, `crypto`)
-- Test files: `{module}_test.go` suffix (e.g., `store_test.go`)
-- Entry point: `cmd/main.go`
-- Internal modules: `internal/{package}` pattern
-
-**Functions:**
-- PascalCase for exported functions: `ScanDirectory`, `SendFile`, `VerifyFile`, `NewSyncer`, `RunFullSync`
-- camelCase for unexported functions: `uploadPhase`, `downloadPhase`, `sendDeleteFile`, `createTables`
-- Handler functions: `handleDashboard`, `handleStatus`, `handleForceSync`, `handleConnection`
-
-**Variables:**
-- camelCase for all variables: `files`, `currentFile`, `rootPath`, `relPath`, `deviceName`
-- Acronyms in variables: lowercase except at start (e.g., `encoder`, `decoder`, `hash` not `Hash`)
-- Short names acceptable in loops: `f`, `n`, `i` used in standard contexts
-- Descriptive multi-word: `currentFileSize`, `currentHasher`, `lastSyncTime`, `forceSyncCh`
-
-**Types (Structs):**
-- PascalCase: `ObjectStore`, `FileMeta`, `FileTransfer`, `CheckFileRequest`, `LocalState`, `FileRecord`, `Config`, `Status`, `ActivityEntry`, `StatusSnapshot`, `Syncer`, `UIServer`
-- Field names: PascalCase for exported (JSON/TOML), matching tags for serialization: `RelPath`, `Hash`, `Size`, `Token`, `ServerAddr`, `SyncDir`
-
-**Constants:**
-- UPPERCASE_SNAKE_CASE for private constants: `maxActivities = 50`
-- Constants for protocol commands: `CmdPing`, `CmdSendFile`, `CmdCheckFile`, etc. (mixed case for command constants)
-- Magic numbers: `4*1024*1024` for 4MB chunks (kept inline rather than named constant)
-- Size unit constants use const block: `KB`, `MB`, `GB` in `status.go` FormatSize function
-
-**Interface Names:**
-- Use `Error` suffix: `error` interface is Go's built-in; no custom interfaces defined in codebase
-
-## Code Style
-
-**Formatting:**
-- Standard Go formatting via implicit gofmt (go build uses gofmt style automatically)
-- No `.editorconfig` or `.prettierrc` found; relies on Go defaults
-- Indentation: tabs (Go standard)
-- Line length: no strict limit observed, but files stay readable
-
-**Linting:**
-- No linter configuration found (no `.golangci.yml`, `.eslintrc`)
-- Code follows Go idioms: error handling via `if err != nil`, resource cleanup via `defer`
-
-## Import Organization
-
-**Order:**
-1. Standard library imports (stdlib, e.g., `fmt`, `os`, `log`)
-2. External third-party (e.g., `github.com/google/uuid`, `github.com/BurntSushi/toml`, `modernc.org/sqlite`)
-3. Internal module imports (e.g., `github.com/atienze/HomelabSecureSync/...`)
-
-**Example from `client/internal/sync/bidirectional.go`:**
-```go
-import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/gob"
-	"encoding/hex"
-	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-
-	"github.com/atienze/HomelabSecureSync/client/internal/scanner"
-	sender "github.com/atienze/HomelabSecureSync/client/internal/sender"
-	"github.com/atienze/HomelabSecureSync/client/internal/state"
-	"github.com/atienze/HomelabSecureSync/common/protocol"
-)
-```
-
-**Path Aliases:**
-- Used for disambiguation: `sender "github.com/atienze/HomelabSecureSync/client/internal/sender"`
-- Used as `bisync` in `client/cmd/main.go` for clarity when importing `sync` package (conflicts with stdlib)
+# Code Conventions
 
 ## Error Handling
 
-**Patterns:**
-- Explicit check: `if err != nil { return ... }`
-- Error wrapping with context: `fmt.Errorf("operation name: %w", err)` throughout codebase
-- Meaningful context in wrapped errors: `fmt.Errorf("upload phase: %w", err)`
-- Early returns on error (no nested try-catch equivalent)
-- Partial progress persisted on error: `s.state.Save(s.statePath)` even if download phase fails (see `client/internal/sync/bidirectional.go` line 52-54)
-- Non-fatal errors logged with `log.Printf` and execution continues (e.g., hash computation failures in scanner)
-- Fatal errors use `log.Fatalf` to exit: `log.Fatalf("Configuration error: %v", err)`
+### Client — Sentinel Errors + Wrapping
 
-**Example from `server/internal/db/db.go`:**
+`client/internal/sync/operations.go` defines sentinel errors for HTTP status mapping:
+
 ```go
-if err := conn.Ping(); err != nil {
-    return nil, fmt.Errorf("failed to connect to database: %w", err)
-}
+var (
+    ErrServerUnreachable = errors.New("server unreachable")
+    ErrTimeout           = errors.New("operation timed out")
+    ErrAuthFailed        = errors.New("authentication failed")
+    ErrHashMismatch      = errors.New("hash mismatch after transfer")
+)
 ```
+
+Errors are wrapped with context using `fmt.Errorf`:
+```go
+return fmt.Errorf("%w: %w", ErrServerUnreachable, err)
+```
+
+The UI server maps these to HTTP status codes via `httpStatusFromErr()`:
+- `ErrServerUnreachable`, `ErrAuthFailed` → 502
+- `ErrTimeout` → 504
+- Everything else → 500
+
+### Server — Log and Continue
+
+Server handler (`receiver/handler.go`) logs errors and either continues or closes:
+- Command decode error → log, continue to next command
+- Auth failure → close connection immediately
+- File write error → clean up temp file, continue
+- Hash mismatch → log warning, remove temp, continue
+
+No errors are returned to the client (except `DeleteFileResponse` and `FileStatusResponse`).
+
+### General Patterns
+
+- No `panic()` — all errors returned
+- Atomic file writes: write to temp → rename (both client and server)
+- Cleanup on failure: `os.Remove(tmpFile)` before returning
+- Close before rename to avoid file-in-use issues
 
 ## Logging
 
-**Framework:** Go's standard `log` package (no external logger)
+### Client
+- `fmt.Printf()` for user-facing output (sync progress, file names)
+- `log.Printf()` for warnings and errors
+- `status.AddActivity()` for daemon mode activity log (shown in UI)
 
-**Patterns:**
-- `log.Printf` for informational/warning messages
-- `log.Fatalf` for fatal errors (exits immediately)
-- Prefix-style messages: `log.Printf("Device %s: operation", deviceName)`
-- Contextual info: `log.Printf("Scanning directory: %s\n", rootPath)`
-- Status messages via `fmt.Printf` for user-facing output (not log package)
-- UI updates via `appStatus.AddActivity` for daemon-mode events
+### Server
+- `log.Printf()` throughout (no structured logging)
+- Connection context: remote address, device name
+- Hash truncation in logs: `hash[:12]` for readability
 
-**Example from `server/internal/receiver/handler.go`:**
+## Naming
+
+### Variables
+
+| Pattern | Example | Usage |
+|---------|---------|-------|
+| `relPath` | `"docs/notes.txt"` | Path relative to sync dir |
+| `fullPath` | `"/home/user/VaultDrive/docs/notes.txt"` | Absolute path |
+| `tmpPath` | temp file location | Intermediate file |
+| `hash` | 64-char SHA-256 hex | Content hash |
+| `conn` | TCP connection | Network |
+| `enc`, `dec` | gob encoder/decoder | Protocol |
+| `st` | `*state.LocalState` | Sync state |
+| `cfg` | `*config.Config` | Configuration |
+| `syncMu` | `*sync.Mutex` | Sync operation serialization |
+| `f` | `*os.File` | File handle |
+
+### Functions
+
+| Style | Examples |
+|-------|---------|
+| Verb-noun | `SendFile()`, `VerifyFile()`, `DownloadFile()`, `DeleteFile()` |
+| Query | `FileExists()`, `HasObject()`, `DeviceExists()`, `HasFile()` |
+| Setter | `SetFile()`, `SetSyncing()`, `SetConnected()` |
+| Getter | `Snapshot()`, `GetHash()`, `GetDeviceName()`, `GetAllFiles()` |
+| Constructor | `New()`, `Open()`, `Load()` |
+
+### Types
+- PascalCase structs: `LocalState`, `Syncer`, `ObjectStore`, `UIServer`
+- Request/Response suffix: `CheckFileRequest`, `DeleteFileResponse`, `FileStatusResponse`
+
+## Import Grouping
+
+Three groups separated by blank lines:
+
 ```go
-log.Printf("New connection from: %s", conn.RemoteAddr().String())
-log.Printf("Authenticated device: %s (from %s)", deviceName, conn.RemoteAddr())
+import (
+    // Standard library
+    "crypto/sha256"
+    "encoding/json"
+    "net"
+
+    // Third-party
+    "github.com/BurntSushi/toml"
+
+    // Local workspace modules
+    "github.com/atienze/HomelabSecureSync/client/internal/config"
+    "github.com/atienze/HomelabSecureSync/common/protocol"
+)
 ```
+
+## File Organization
+
+Consistent structure within each `.go` file:
+
+1. Package declaration + doc comment
+2. Imports (grouped as above)
+3. Constants
+4. Type definitions (structs)
+5. Constructor / `New()` / `Open()` / `Load()`
+6. Public methods
+7. Private helper methods
 
 ## Comments
 
-**When to Comment:**
-- Algorithm explanation or non-obvious logic: see `server/internal/db/db.go` lines 46-49 explaining SQLite quirk
-- SQL comment blocks in schema: `-- Tracks every file the server has received`
-- Phase references: `// Phase 2 Auth:`, `// Phase 4:` mark protocol version boundaries
-- Caveats and safety nets: `// Safety net: if DB says the file exists but the blob is missing...`
-- Caller responsibility notes: `// The caller is responsible for verifying the hash before calling this.`
+- **Package-level:** Brief purpose description
+- **Exported types:** Describe struct responsibility
+- **Methods:** Explain behavior, especially non-obvious logic
+- **Inline:** Sparingly, for "why" not "what"
+- **No TODO comments** — planning tracked in `.planning/` directory
 
-**JSDoc/TSDoc:**
-- Not used; this is Go, not TypeScript
-- Doc comments (godoc style) used for exported types and functions:
-
-**Example from `server/internal/store/store.go`:**
+Example from `state/state.go`:
 ```go
-// ObjectStore manages content-addressable blob storage.
-// Files are stored at {baseDir}/objects/{hash[:2]}/{hash[2:]}.
-type ObjectStore struct {
-	baseDir string
+// LocalState tracks the last-known hash of each synced file.
+// Persisted to state.json so deletions can be detected across runs.
+type LocalState struct {
+    Files map[string]string `json:"files"` // relPath → SHA-256 hash
 }
-
-// New creates an ObjectStore rooted at baseDir.
-// It ensures the objects/ and tmp/ subdirectories exist.
-func New(baseDir string) (*ObjectStore, error) {
 ```
 
-## Function Design
+## JSON Response Format
 
-**Size:** Functions are generally 10-60 lines; larger operations split across phases or helper functions
+HTTP API uses consistent envelope:
 
-**Parameters:**
-- Passed by value for primitives and small structs
-- Passed by pointer for receiver methods: `func (s *ObjectStore) HasObject(hash string) bool`
-- Pointers for large/mutable structs: `func (s *LocalState) Save(path string) error`
-- Multiple parameters accepted inline (no parameter objects in most cases, except protocol types like `FileTransfer`)
-
-**Return Values:**
-- Go idiom: return value + error tuple: `func (s *LocalState) Load(path string) (*LocalState, error)`
-- Single value for simple queries: `func (s *ObjectStore) HasObject(hash string) bool` returns bool only
-- Multiple return values for counts: `func (s *Syncer) RunFullSync() (uploaded, downloaded, deleted int, err error)`
-- Error as last return value always
-
-**Example from `server/internal/db/db.go`:**
 ```go
-// GetDeviceName looks up the human-readable name for a registered token.
-// Returns ("", false, nil) if the token is not found (unregistered).
-// Returns (name, true, nil) on success.
-// Returns ("", false, err) on a database error.
-func (db *DB) GetDeviceName(token string) (string, bool, error) {
-```
+// File list endpoints
+{"files": [{"rel_path": "...", "hash": "...", "size": 1024, "size_human": "1.0 KB"}]}
 
-## Module Design
-
-**Exports:**
-- Package-level functions and types are exported (PascalCase)
-- Helper functions unexported (camelCase)
-- Struct fields exported if needed for serialization (JSON/TOML tags)
-
-**Barrel Files:**
-- Not used; imports are explicit (`import "github.com/atienze/HomelabSecureSync/server/internal/db"`)
-- Each package is imported directly, no aggregator files
-
-**Example of clean module interface from `client/internal/scanner/scan.go`:**
-```go
-// FileMeta represents one file we found
-type FileMeta struct {
-	Path string
-	Hash string
-	Size int64
-}
-
-// ScanDirectory walks through a folder and fingerprints every file
-func ScanDirectory(rootPath string) ([]FileMeta, error) {
-```
-
-## Defer Usage
-
-**Resource Cleanup:**
-- All file opens: `defer file.Close()`
-- All DB queries: `defer rows.Close()`
-- Network connections: `defer conn.Close()` in handlers
-- Temp file cleanup on error: `defer os.Remove(tmpPath)` in function bodies before potential error
-
-**Example from `client/internal/state/state.go`:**
-```go
-if err := tmp.Close(); err != nil {
-    os.Remove(tmpPath)
-    return fmt.Errorf("close temp state file: %w", err)
-}
+// Mutation endpoints
+{"ok": true, "message": "..."}   // success
+{"ok": false, "message": "..."}  // failure
 ```
 
 ## Concurrency Patterns
 
-**Synchronization:**
-- `sync.RWMutex` used for protecting shared state: `Status` type in `client/internal/status/status.go`
-- Lock/Unlock pattern: `s.mu.Lock(); defer s.mu.Unlock()`
-- Channels for signaling: `forceSyncCh chan struct{}` for triggering syncs in daemon mode
-- Non-blocking send on channel: `select { case ch <- val: default: }` to avoid blocking daemon loop
-
-**Example from `client/internal/status/status.go`:**
-```go
-func (s *Status) AddActivity(msg string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	// ... mutation
-}
-```
-
-**Example of snapshot pattern for thread-safe reading:**
-```go
-func (s *Status) Snapshot() StatusSnapshot {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	acts := make([]ActivityEntry, len(s.activities))
-	copy(acts, s.activities)  // Deep copy for safety
-	return StatusSnapshot{...}
-}
-```
-
-## Go Workspace Structure
-
-**Modules:**
-- Three modules in a workspace: `common/`, `client/`, `server/`
-- Each has its own `go.mod`
-- Workspace file binds them together for coordinated builds
-- Import paths: `github.com/atienze/HomelabSecureSync/{common,client,server}/...`
-
-**Build Requirement:**
-- Build commands must be run from workspace root so `go build` resolves relative module imports correctly
-- `go build ./server/cmd` from root works; from subdirectory may fail
-
----
-
-*Convention analysis: 2025-03-11*
+- `sync.Mutex` for serializing sync operations (UI handlers + daemon loop)
+- `sync.RWMutex` for thread-safe status reads/writes
+- Channel-based signaling: `forceSyncCh chan struct{}` (buffer 1)
+- `SetMaxOpenConns(1)` for SQLite single-writer
+- Atomic file operations: temp + rename

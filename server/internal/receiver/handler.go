@@ -346,6 +346,16 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				continue
 			}
 
+			// If client sent an empty hash, look up the current hash by path.
+			if req.Hash == "" {
+				fileHash, exists, dbErr := database.GetFileHash(req.RelPath)
+				if dbErr != nil || !exists {
+					log.Printf("No hash found for download request %s from %s", req.RelPath, deviceName)
+					continue
+				}
+				req.Hash = fileHash
+			}
+
 			if !objectStore.HasObject(req.Hash) {
 				log.Printf("Requested blob missing for %s (hash %s)", req.RelPath, req.Hash[:12])
 				continue

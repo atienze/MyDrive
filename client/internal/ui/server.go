@@ -181,7 +181,7 @@ func (u *UIServer) handleForceSync(w http.ResponseWriter, r *http.Request) {
 // handleClientFileList returns a JSON list of all files in the local sync directory.
 // GET /api/files/client — no mutex acquisition (read-only).
 func (u *UIServer) handleClientFileList(w http.ResponseWriter, r *http.Request) {
-	files, err := scanner.ScanDirectory(u.cfg.SyncDir)
+	files, err := scanner.ScanDirectoryQuiet(u.cfg.SyncDir)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("scan failed: %v", err))
 		return
