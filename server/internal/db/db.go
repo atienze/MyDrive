@@ -199,6 +199,23 @@ func (db *DB) GetFileHash(relPath, deviceID string) (string, bool, error) {
 	return hash, true, nil
 }
 
+// GetFileHashAnyDevice returns the hash for a non-deleted file at relPath,
+// regardless of which device owns it. Used by CmdRequestFile for cross-device pull.
+// Returns ("", "", false, nil) if not found.
+func (db *DB) GetFileHashAnyDevice(relPath string) (hash string, deviceID string, found bool, err error) {
+	err = db.conn.QueryRow(
+		`SELECT hash, device_id FROM files WHERE rel_path = ? AND deleted = FALSE LIMIT 1`,
+		relPath,
+	).Scan(&hash, &deviceID)
+	if err == sql.ErrNoRows {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, fmt.Errorf("get file hash any device for %s: %w", relPath, err)
+	}
+	return hash, deviceID, true, nil
+}
+
 // MarkDeleted soft-deletes a file — we keep the record but flag it as gone.
 func (db *DB) MarkDeleted(relPath, deviceID string) error {
 	query := `UPDATE files SET deleted = TRUE WHERE rel_path = ? AND device_id = ?`

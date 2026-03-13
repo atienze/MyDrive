@@ -358,9 +358,10 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			}
 
 			// If client sent an empty hash, look up the current hash by path.
+			// Use GetFileHashAnyDevice so a device can pull files uploaded by other devices.
 			if req.Hash == "" {
-				fileHash, exists, dbErr := database.GetFileHash(req.RelPath, deviceName)
-				if dbErr != nil || !exists {
+				fileHash, _, ok, dbErr := database.GetFileHashAnyDevice(req.RelPath)
+				if dbErr != nil || !ok {
 					log.Printf("No hash found for download request %s from %s", req.RelPath, deviceName)
 					continue
 				}
