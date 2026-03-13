@@ -301,6 +301,127 @@ func DeleteServerFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 	return nil
 }
 
+// PullFile connects to the server, fetches the file manifest, finds the file
+// owned by fromDevice at relPath, and downloads it by hash. Updates local state
+// on success so the file will be tracked (and uploaded under this device on next sync).
+func PullFile(cfg *config.Config, st *state.LocalState, statePath, fromDevice, relPath string) error {
+	// Step 1: Fetch the full file list to find the hash for this device+path.
+	entries, err := FetchServerFileList(cfg)
+	if err != nil {
+		return fmt.Errorf("fetch server file list: %w", err)
+	}
+
+	var targetHash string
+	for _, e := range entries {
+		if e.DeviceID == fromDevice && e.RelPath == relPath {
+			targetHash = e.Hash
+			break
+		}
+	}
+	if targetHash == "" {
+		return fmt.Errorf("file %q not found on device %q", relPath, fromDevice)
+	}
+
+	// Step 2: Download by hash using a dedicated connection.
+	conn, encoder, decoder, err := DialAndHandshake(cfg)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+		return fmt.Errorf("set deadline: %w", err)
+	}
+
+	// Send CmdRequestFile with the known hash.
+	req := protocol.RequestFileRequest{RelPath: relPath, Hash: targetHash}
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(req); err != nil {
+		return fmt.Errorf("encode request: %w", err)
+	}
+	if err := encoder.Encode(protocol.Packet{
+		Cmd:     protocol.CmdRequestFile,
+		Payload: buf.Bytes(),
+	}); err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+
+	// Read file data header.
+	var hdrPacket protocol.Packet
+	if err := decoder.Decode(&hdrPacket); err != nil {
+		return fmt.Errorf("read file data header: %w", err)
+	}
+	if hdrPacket.Cmd != protocol.CmdFileDataHeader {
+		return fmt.Errorf("unexpected command: %d (expected %d)", hdrPacket.Cmd, protocol.CmdFileDataHeader)
+	}
+
+	var header protocol.FileDataHeader
+	if err := gob.NewDecoder(bytes.NewBuffer(hdrPacket.Payload)).Decode(&header); err != nil {
+		return fmt.Errorf("decode file data header: %w", err)
+	}
+
+	// Create parent directories and temp file.
+	fullPath := filepath.Join(cfg.SyncDir, relPath)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		return fmt.Errorf("create parent dirs: %w", err)
+	}
+
+	tmpFile, err := os.CreateTemp(filepath.Dir(fullPath), ".vaultsync-dl-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	// Receive chunks, write to temp, compute hash.
+	hasher := sha256.New()
+	writer := io.MultiWriter(tmpFile, hasher)
+	var received int64
+
+	for received < header.Size {
+		var chunkPacket protocol.Packet
+		if err := decoder.Decode(&chunkPacket); err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("read chunk: %w", err)
+		}
+		if chunkPacket.Cmd != protocol.CmdFileDataChunk {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("unexpected command during download: %d", chunkPacket.Cmd)
+		}
+
+		n, err := writer.Write(chunkPacket.Payload)
+		if err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return fmt.Errorf("write chunk: %w", err)
+		}
+		received += int64(n)
+	}
+	tmpFile.Close()
+
+	// Verify hash.
+	computedHash := hex.EncodeToString(hasher.Sum(nil))
+	if computedHash != header.Hash {
+		os.Remove(tmpPath)
+		return fmt.Errorf("%w: expected %s, got %s", ErrHashMismatch, header.Hash[:12], computedHash[:12])
+	}
+
+	// Atomic rename.
+	if err := os.Rename(tmpPath, fullPath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename to final path: %w", err)
+	}
+
+	// Track in local state so next sync uploads under this device's ID.
+	st.SetFile(relPath, header.Hash)
+	if err := st.Save(statePath); err != nil {
+		return fmt.Errorf("persist state after pull: %w", err)
+	}
+
+	return nil
+}
+
 // computeFileHash opens a file and returns its SHA-256 hash as a hex string.
 func computeFileHash(fullPath string) (string, error) {
 	f, err := os.Open(fullPath)
