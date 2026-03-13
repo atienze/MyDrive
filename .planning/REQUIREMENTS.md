@@ -38,10 +38,10 @@
 
 ### Client Sync
 
-- [ ] **SYNC-01**: Default sync mode is push-only (upload phase only, no automatic download)
-- [ ] **SYNC-02**: CLI command `vault-sync pull --from <device> <path>` downloads specific files from another device
-- [ ] **SYNC-03**: Deletion on client removes only this device's record on server
-- [ ] **SYNC-04**: `state.json` continues tracking local device's `relPath → hash` (no structural change needed)
+- [x] **SYNC-01**: Default sync mode is push-only (upload phase only, no automatic download)
+- [x] **SYNC-02**: CLI command `vault-sync pull --from <device> <path>` downloads specific files from another device
+- [x] **SYNC-03**: Deletion on client removes only this device's record on server
+- [x] **SYNC-04**: `state.json` continues tracking local device's `relPath → hash` (no structural change needed)
 
 ### Web UI
 
@@ -94,10 +94,10 @@
 | SRVR-04 | Phase 2 | Pending |
 | SRVR-05 | Phase 2 | Pending |
 | SRVR-06 | Phase 2 | Pending |
-| SYNC-01 | Phase 2 | Pending |
-| SYNC-02 | Phase 2 | Pending |
-| SYNC-03 | Phase 2 | Pending |
-| SYNC-04 | Phase 2 | Pending |
+| SYNC-01 | Phase 2 | Complete |
+| SYNC-02 | Phase 2 | Complete |
+| SYNC-03 | Phase 2 | Complete |
+| SYNC-04 | Phase 2 | Complete |
 | WEBU-01 | Phase 3 | Pending |
 | WEBU-02 | Phase 3 | Pending |
 | WEBU-03 | Phase 3 | Pending |

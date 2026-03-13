@@ -7,7 +7,7 @@ The existing single-device sync is fully functional. This milestone transforms t
 ## Phases
 
 - [ ] **Phase 1: Data Layer** - Migrate schema to per-device namespaces and scope all DB + protocol primitives to device_id
-- [ ] **Phase 2: Sync Behavior** - Scope server commands to device ownership, replace bidirectional sync with push-only + explicit pull CLI
+- [x] **Phase 2: Sync Behavior** - Scope server commands to device ownership, replace bidirectional sync with push-only + explicit pull CLI (completed 2026-03-13)
 - [ ] **Phase 3: Web UI** - Surface device ownership in the browser, enable cross-device file downloads
 
 ## Phase Details
@@ -64,5 +64,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Layer | 1/3 | In Progress|  |
-| 2. Sync Behavior | 0/2 | Not started | - |
+| 2. Sync Behavior | 2/2 | Complete   | 2026-03-13 |
 | 3. Web UI | 0/2 | Not started | - |

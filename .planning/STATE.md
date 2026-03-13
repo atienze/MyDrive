@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-data-layer-02-PLAN.md
-last_updated: "2026-03-13T05:38:22.581Z"
+stopped_at: Completed 02-sync-behavior-02-PLAN.md
+last_updated: "2026-03-13T06:05:03.200Z"
 last_activity: "2026-03-12 — All phases planned (Phase 1: 3 plans, Phase 2: 2 plans, Phase 3: 2 plans)"
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 1
+  completed_plans: 5
   percent: 14
 ---
 
@@ -51,6 +51,7 @@ Progress: [█░░░░░░░░░] 14%
 
 *Updated after each plan completion*
 | Phase 01-data-layer P02 | 2 | 2 tasks | 4 files |
+| Phase 02-sync-behavior P02 | 2 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ Recent decisions affecting current work:
 - Reference-counted server cleanup — server removes files when no device references them
 - Web UI grouped by device for clear ownership visibility
 - [Phase 01-data-layer]: DeviceID added as last field of ServerFileEntry for gob forward-compatibility; Version bumped to 3 requiring client+server rebuild together
+- [Phase 02-sync-behavior]: SetLastSync simplified to (uploaded int, err error) — lastSyncDown/lastSyncDeleted kept for Phase 3 JSON compatibility
+- [Phase 02-sync-behavior]: PullFile uses two connections: FetchServerFileList to resolve hash by DeviceID, then dedicated download connection
+- [Phase 02-sync-behavior]: CmdRequestFile uses GetFileHashAnyDevice for cross-device pulls; write paths remain device-scoped
 
 ### Pending Todos
 
@@ -76,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-13T05:38:22.577Z
-Stopped at: Completed 01-data-layer-02-PLAN.md
+Last session: 2026-03-13T06:04:45.847Z
+Stopped at: Completed 02-sync-behavior-02-PLAN.md
 Resume file: None
