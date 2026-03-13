@@ -63,6 +63,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Layer | 0/3 | Not started | - |
+| 1. Data Layer | 1/3 | In Progress|  |
 | 2. Sync Behavior | 0/2 | Not started | - |
 | 3. Web UI | 0/2 | Not started | - |
