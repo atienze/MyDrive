@@ -53,7 +53,11 @@ Plans:
   2. User can click a download button next to any file in any device's section to pull it locally
   3. Delete button label and behavior makes clear it removes only this device's copy
   4. Push button uploads under the current device's ID (not a global namespace)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Go backend: DeviceID in file list JSON, handlePull endpoint, DeviceName in status API
+- [ ] 03-02-PLAN.md — Dashboard HTML: device-grouped server panel, pull-device action, conditional delete buttons
 
 ## Progress
 
@@ -61,4 +65,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Data Layer | 0/3 | Not started | - |
 | 2. Sync Behavior | 0/2 | Not started | - |
-| 3. Web UI | 0/TBD | Not started | - |
+| 3. Web UI | 0/2 | Not started | - |
