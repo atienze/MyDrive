@@ -85,15 +85,17 @@ func (s *Status) SetStorageStats(files int, size int64) {
 	s.mu.Unlock()
 }
 
-// SetLastSync records the results of a completed sync cycle.
-func (s *Status) SetLastSync(uploaded, downloaded, deleted int, err error) {
+// SetLastSync records the results of a completed push-only sync cycle.
+// lastSyncDown and lastSyncDeleted are always 0 after push-only sync;
+// fields are kept for JSON compatibility until the UI is updated in Phase 3.
+func (s *Status) SetLastSync(uploaded int, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.lastSyncTime = time.Now()
 	s.lastSyncUp = uploaded
-	s.lastSyncDown = downloaded
-	s.lastSyncDeleted = deleted
+	s.lastSyncDown = 0
+	s.lastSyncDeleted = 0
 
 	if err != nil {
 		s.lastSyncError = err.Error()

@@ -45,7 +45,7 @@ func TestSharedStateNotReloaded(t *testing.T) {
 	fakeCfg := makeTestConfig(tmpDir)
 	statePath := filepath.Join(tmpDir, "state.json")
 
-	_, _, _, _ = runSyncCycleWithState(fakeCfg, st, statePath)
+	_, _ = runSyncCycleWithState(fakeCfg, st, statePath)
 
 	// The pointer must be the same object — no replacement.
 	if st != ptrBefore {

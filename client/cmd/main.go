@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -23,7 +24,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: vault-sync <sync|daemon>")
+		fmt.Fprintln(os.Stderr, "Usage: vault-sync <sync|daemon|pull>")
 		os.Exit(1)
 	}
 
@@ -32,30 +33,62 @@ func main() {
 		runSync()
 	case "daemon":
 		runDaemon()
+	case "pull":
+		runPull(os.Args[2:])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: vault-sync <sync|daemon>\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: vault-sync <sync|daemon|pull>\n", os.Args[1])
 		os.Exit(1)
 	}
 }
 
-// runSync performs a single full bidirectional sync cycle and exits.
+// runSync performs a single push-only sync cycle and exits.
 func runSync() {
-	fmt.Println("--- VaultSync: One-Shot Sync ---")
+	fmt.Println("--- VaultSync: Push Sync ---")
 
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Configuration error: %v", err)
 	}
 
-	uploaded, downloaded, deleted, err := runSyncCycle(cfg)
+	uploaded, err := runSyncCycle(cfg)
 	if err != nil {
 		log.Fatalf("Sync failed: %v", err)
 	}
 
 	fmt.Println("\n--- Sync Complete ---")
-	fmt.Printf("Uploaded:   %d\n", uploaded)
-	fmt.Printf("Downloaded: %d\n", downloaded)
-	fmt.Printf("Deleted:    %d\n", deleted)
+	fmt.Printf("Uploaded: %d\n", uploaded)
+}
+
+// runPull downloads a single file from a named device.
+func runPull(args []string) {
+	fs := flag.NewFlagSet("pull", flag.ExitOnError)
+	fromDevice := fs.String("from", "", "Source device name (required)")
+	fs.Parse(args)
+
+	if *fromDevice == "" || fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: vault-sync pull --from <device> <path>")
+		os.Exit(1)
+	}
+	relPath := fs.Arg(0)
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
+	statePath, err := config.StatePath()
+	if err != nil {
+		log.Fatalf("Resolve state path: %v", err)
+	}
+	st, err := state.Load(statePath)
+	if err != nil {
+		log.Fatalf("Load state: %v", err)
+	}
+
+	if err := bisync.PullFile(cfg, st, statePath, *fromDevice, relPath); err != nil {
+		log.Fatalf("Pull failed: %v", err)
+	}
+	fmt.Printf("Pulled: %s (from %s)\n", relPath, *fromDevice)
 }
 
 // runDaemon starts the web UI, performs an initial sync, then waits for
@@ -125,10 +158,10 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 	appStatus.SetSyncing(true)
 	appStatus.AddActivity("Starting sync cycle...")
 
-	uploaded, downloaded, deleted, err := runSyncCycleWithState(cfg, st, statePath)
+	uploaded, err := runSyncCycleWithState(cfg, st, statePath)
 
 	appStatus.SetSyncing(false)
-	appStatus.SetLastSync(uploaded, downloaded, deleted, err)
+	appStatus.SetLastSync(uploaded, err)
 
 	if err != nil {
 		appStatus.SetConnected(false)
@@ -136,10 +169,7 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 		log.Printf("Sync failed: %v", err)
 	} else {
 		appStatus.SetConnected(true)
-		appStatus.AddActivity(fmt.Sprintf(
-			"Sync complete: %d uploaded, %d downloaded, %d deleted",
-			uploaded, downloaded, deleted,
-		))
+		appStatus.AddActivity(fmt.Sprintf("Sync complete: %d uploaded", uploaded))
 		updateStorageStats(cfg, appStatus, st)
 	}
 }
@@ -158,17 +188,17 @@ func updateStorageStats(cfg *config.Config, appStatus *status.Status, st *state.
 	appStatus.SetStorageStats(totalFiles, totalSize)
 }
 
-// runSyncCycleWithState opens a connection, performs a full bidirectional sync
+// runSyncCycleWithState opens a connection, performs a push-only sync
 // using the provided shared state, and closes. Used by the daemon to avoid
 // per-cycle state.Load() calls and prevent races with UI state mutations.
-func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath string) (uploaded, downloaded, deleted int, err error) {
+func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath string) (int, error) {
 	fmt.Printf("Sync dir: %s\n", cfg.SyncDir)
 	fmt.Printf("Server:   %s\n", cfg.ServerAddr)
 
 	// Connect to the server.
 	conn, err := net.Dial("tcp", cfg.ServerAddr)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("connect to server: %w", err)
+		return 0, fmt.Errorf("connect to server: %w", err)
 	}
 	defer conn.Close()
 
@@ -182,41 +212,41 @@ func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath s
 		Token:       cfg.Token,
 	}
 	if err := encoder.Encode(shake); err != nil {
-		return 0, 0, 0, fmt.Errorf("handshake: %w", err)
+		return 0, fmt.Errorf("handshake: %w", err)
 	}
 
-	// Run the full bidirectional sync using the shared state.
+	// Run the push-only sync using the shared state.
 	start := time.Now()
 	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st)
-	uploaded, downloaded, deleted, err = syncer.RunFullSync()
+	uploaded, err := syncer.RunSync()
 	if err != nil {
-		return uploaded, downloaded, deleted, err
+		return uploaded, err
 	}
 
 	fmt.Printf("Sync took %s\n", time.Since(start))
-	return uploaded, downloaded, deleted, nil
+	return uploaded, nil
 }
 
-// runSyncCycle opens a connection, performs a full bidirectional sync, and closes.
+// runSyncCycle opens a connection, performs a push-only sync, and closes.
 // Each cycle gets a fresh TCP connection to avoid stale connection issues.
-func runSyncCycle(cfg *config.Config) (uploaded, downloaded, deleted int, err error) {
+func runSyncCycle(cfg *config.Config) (int, error) {
 	fmt.Printf("Sync dir: %s\n", cfg.SyncDir)
 	fmt.Printf("Server:   %s\n", cfg.ServerAddr)
 
 	// Load local state (tracks what we synced last time).
 	statePath, err := config.StatePath()
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("resolve state path: %w", err)
+		return 0, fmt.Errorf("resolve state path: %w", err)
 	}
 	st, err := state.Load(statePath)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("load state: %w", err)
+		return 0, fmt.Errorf("load state: %w", err)
 	}
 
 	// Connect to the server.
 	conn, err := net.Dial("tcp", cfg.ServerAddr)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("connect to server: %w", err)
+		return 0, fmt.Errorf("connect to server: %w", err)
 	}
 	defer conn.Close()
 
@@ -230,17 +260,17 @@ func runSyncCycle(cfg *config.Config) (uploaded, downloaded, deleted int, err er
 		Token:       cfg.Token,
 	}
 	if err := encoder.Encode(shake); err != nil {
-		return 0, 0, 0, fmt.Errorf("handshake: %w", err)
+		return 0, fmt.Errorf("handshake: %w", err)
 	}
 
-	// Run the full bidirectional sync.
+	// Run the push-only sync.
 	start := time.Now()
 	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st)
-	uploaded, downloaded, deleted, err = syncer.RunFullSync()
+	uploaded, err := syncer.RunSync()
 	if err != nil {
-		return uploaded, downloaded, deleted, err
+		return uploaded, err
 	}
 
 	fmt.Printf("Sync took %s\n", time.Since(start))
-	return uploaded, downloaded, deleted, nil
+	return uploaded, nil
 }
