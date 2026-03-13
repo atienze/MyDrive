@@ -40,37 +40,20 @@ func createV2DB(t *testing.T) (string, *sql.DB) {
 	return dbPath, db
 }
 
-// hasAutoIndex checks whether the sqlite_autoindex_files_1 index exists on the files table.
-// This index is present in v2 (UNIQUE(rel_path)) but absent after migration.
-func hasAutoIndex(db *sql.DB) (bool, error) {
-	rows, err := db.Query("PRAGMA index_list(files)")
+// autoIndexColumnCount returns the number of columns in sqlite_autoindex_files_1.
+// v2 schema has 1 column (rel_path), v3 has 2 columns (rel_path, device_id).
+func autoIndexColumnCount(db *sql.DB) (int, error) {
+	rows, err := db.Query("PRAGMA index_info(sqlite_autoindex_files_1)")
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	defer rows.Close()
 
-	cols, err := rows.Columns()
-	if err != nil {
-		return false, err
-	}
-
+	var count int
 	for rows.Next() {
-		vals := make([]interface{}, len(cols))
-		ptrs := make([]interface{}, len(cols))
-		for i := range vals {
-			ptrs[i] = &vals[i]
-		}
-		if err := rows.Scan(ptrs...); err != nil {
-			return false, err
-		}
-		// The second column is the index name
-		if len(vals) >= 2 {
-			if name, ok := vals[1].(string); ok && name == "sqlite_autoindex_files_1" {
-				return true, nil
-			}
-		}
+		count++
 	}
-	return false, rows.Err()
+	return count, rows.Err()
 }
 
 // TestMigration verifies the basic migration path:
@@ -91,13 +74,13 @@ func TestMigration(t *testing.T) {
 		t.Fatalf("insert row 2: %v", err)
 	}
 
-	// Verify the autoindex is present before migration (v2 schema)
-	present, err := hasAutoIndex(db)
+	// Verify the autoindex has 1 column before migration (v2 schema)
+	colCount, err := autoIndexColumnCount(db)
 	if err != nil {
 		t.Fatalf("checking pre-migration index: %v", err)
 	}
-	if !present {
-		t.Fatal("expected sqlite_autoindex_files_1 to be present in v2 schema")
+	if colCount != 1 {
+		t.Fatalf("expected 1-column autoindex in v2 schema, got %d", colCount)
 	}
 	db.Close()
 
@@ -113,13 +96,13 @@ func TestMigration(t *testing.T) {
 	}
 	defer db2.Close()
 
-	// The autoindex should be gone
-	present, err = hasAutoIndex(db2)
+	// The autoindex should now have 2 columns (composite constraint)
+	colCount, err = autoIndexColumnCount(db2)
 	if err != nil {
 		t.Fatalf("checking post-migration index: %v", err)
 	}
-	if present {
-		t.Error("expected sqlite_autoindex_files_1 to be absent after migration")
+	if colCount != 2 {
+		t.Errorf("expected 2-column autoindex after migration, got %d", colCount)
 	}
 
 	// Both rows must still exist
