@@ -66,9 +66,10 @@ type DeleteFileResponse struct {
 type ListServerFilesRequest struct{}
 
 type ServerFileEntry struct {
-	RelPath string
-	Hash    string
-	Size    int64
+	RelPath  string
+	Hash     string
+	Size     int64
+	DeviceID string // identifies which device owns this file (PROT-01)
 }
 
 type ServerFileListResponse struct {

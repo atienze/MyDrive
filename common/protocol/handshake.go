@@ -14,5 +14,5 @@ const (
 	// it hangs up immediately. It prevents random traffic (like HTTP)
 	// from confusing our server.
 	MagicNumber = 0xCAFEBABE // A classic hex number used in programming
-	Version     = 2          // Version 2: token-based auth (was ClientID string in v1)
+	Version     = 3          // Version 3: multi-device per-device namespaces
 )

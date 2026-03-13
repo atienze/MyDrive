@@ -32,6 +32,16 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		return
 	}
 
+	if shake.MagicNumber != protocol.MagicNumber {
+		log.Printf("Rejected connection from %s: invalid magic number", conn.RemoteAddr())
+		return
+	}
+	if shake.Version != protocol.Version {
+		log.Printf("Rejected connection from %s: protocol version mismatch (client=%d, server=%d)",
+			conn.RemoteAddr(), shake.Version, protocol.Version)
+		return
+	}
+
 	// --- Phase 2 Auth: validate token against the devices table ---
 	// If the token is not registered, close the connection immediately.
 	// We do not reveal whether the token exists or why it was rejected.
