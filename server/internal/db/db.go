@@ -70,15 +70,16 @@ func (db *DB) Close() error {
 // Using backticks (`) in Go lets us write multi-line strings — perfect for SQL.
 func (db *DB) createTables() error {
 	schema := `
-    -- Tracks every file the server has received
+    -- Tracks every file the server has received (v3: composite unique per device)
     CREATE TABLE IF NOT EXISTS files (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        rel_path    TEXT NOT NULL UNIQUE,   -- e.g. "Documents/resume.pdf"
+        rel_path    TEXT NOT NULL,          -- e.g. "Documents/resume.pdf"
         hash        TEXT NOT NULL,          -- SHA-256 of the file content
         size        INTEGER NOT NULL,       -- file size in bytes
         device_id   TEXT NOT NULL,          -- which device sent this
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted     BOOLEAN DEFAULT FALSE   -- soft delete flag for future use
+        deleted     BOOLEAN DEFAULT FALSE,  -- soft delete flag
+        UNIQUE(rel_path, device_id)
     );
 
     -- Tracks registered devices (we'll fill this more in Phase 2)
@@ -109,10 +110,9 @@ func (db *DB) UpsertFile(relPath, hash, deviceID string, size int64) error {
 	query := `
     INSERT INTO files (rel_path, hash, size, device_id, uploaded_at, deleted)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, FALSE)
-    ON CONFLICT(rel_path) DO UPDATE SET
+    ON CONFLICT(rel_path, device_id) DO UPDATE SET
         hash        = excluded.hash,
         size        = excluded.size,
-        device_id   = excluded.device_id,
         uploaded_at = CURRENT_TIMESTAMP,
         deleted     = FALSE
     `
@@ -129,16 +129,14 @@ func (db *DB) UpsertFile(relPath, hash, deviceID string, size int64) error {
 // FileExists checks if we already have a file with this exact path AND hash.
 // Returns true if the file is already stored and unchanged — meaning skip it.
 // Returns false if we need the file (new file, or file has changed).
-func (db *DB) FileExists(relPath, hash string) (bool, error) {
+func (db *DB) FileExists(relPath, hash, deviceID string) (bool, error) {
 	query := `
     SELECT COUNT(*) FROM files
-    WHERE rel_path = ? AND hash = ? AND deleted = FALSE
+    WHERE rel_path = ? AND hash = ? AND device_id = ? AND deleted = FALSE
     `
 
 	var count int
-	// QueryRow is used for queries that return exactly one row.
-	// Scan() reads the result into our variable (count).
-	err := db.conn.QueryRow(query, relPath, hash).Scan(&count)
+	err := db.conn.QueryRow(query, relPath, hash, deviceID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("check file exists %s: %w", relPath, err)
 	}
@@ -187,10 +185,10 @@ func (db *DB) GetAllFiles() ([]FileRecord, error) {
 
 // GetFileHash returns the hash for a non-deleted file at the given path.
 // Returns ("", false, nil) if the file does not exist or is already deleted.
-func (db *DB) GetFileHash(relPath string) (string, bool, error) {
+func (db *DB) GetFileHash(relPath, deviceID string) (string, bool, error) {
 	var hash string
 	err := db.conn.QueryRow(
-		`SELECT hash FROM files WHERE rel_path = ? AND deleted = FALSE`, relPath,
+		`SELECT hash FROM files WHERE rel_path = ? AND device_id = ? AND deleted = FALSE`, relPath, deviceID,
 	).Scan(&hash)
 	if err == sql.ErrNoRows {
 		return "", false, nil
@@ -202,10 +200,62 @@ func (db *DB) GetFileHash(relPath string) (string, bool, error) {
 }
 
 // MarkDeleted soft-deletes a file — we keep the record but flag it as gone.
-func (db *DB) MarkDeleted(relPath string) error {
-	query := `UPDATE files SET deleted = TRUE WHERE rel_path = ?`
-	_, err := db.conn.Exec(query, relPath)
+func (db *DB) MarkDeleted(relPath, deviceID string) error {
+	query := `UPDATE files SET deleted = TRUE WHERE rel_path = ? AND device_id = ?`
+	_, err := db.conn.Exec(query, relPath, deviceID)
 	return err
+}
+
+// GetFilesForDevice returns all non-deleted files owned by the given device.
+func (db *DB) GetFilesForDevice(deviceID string) ([]FileRecord, error) {
+	query := `
+    SELECT id, rel_path, hash, size, device_id, uploaded_at
+    FROM files
+    WHERE device_id = ? AND deleted = FALSE
+    ORDER BY rel_path
+    `
+	rows, err := db.conn.Query(query, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("get files for device %s: %w", deviceID, err)
+	}
+	defer rows.Close()
+
+	var files []FileRecord
+	for rows.Next() {
+		var f FileRecord
+		err := rows.Scan(&f.ID, &f.RelPath, &f.Hash, &f.Size, &f.DeviceID, &f.UploadedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan file row: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
+}
+
+// GetSharedFiles returns all non-deleted files from devices other than the given one.
+func (db *DB) GetSharedFiles(excludeDeviceID string) ([]FileRecord, error) {
+	query := `
+    SELECT id, rel_path, hash, size, device_id, uploaded_at
+    FROM files
+    WHERE device_id != ? AND deleted = FALSE
+    ORDER BY rel_path
+    `
+	rows, err := db.conn.Query(query, excludeDeviceID)
+	if err != nil {
+		return nil, fmt.Errorf("get shared files excluding %s: %w", excludeDeviceID, err)
+	}
+	defer rows.Close()
+
+	var files []FileRecord
+	for rows.Next() {
+		var f FileRecord
+		err := rows.Scan(&f.ID, &f.RelPath, &f.Hash, &f.Size, &f.DeviceID, &f.UploadedAt)
+		if err != nil {
+			return nil, fmt.Errorf("scan file row: %w", err)
+		}
+		files = append(files, f)
+	}
+	return files, rows.Err()
 }
 
 // ----------------------------------------

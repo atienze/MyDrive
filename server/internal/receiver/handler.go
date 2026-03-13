@@ -97,7 +97,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				continue
 			}
 
-			exists, err := database.FileExists(req.RelPath, req.Hash)
+			exists, err := database.FileExists(req.RelPath, req.Hash, deviceName)
 			if err != nil {
 				// If the DB check fails, tell client we need the file.
 				// Better to receive a duplicate than to silently lose data.
@@ -282,7 +282,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			}
 
 			// Get the hash before marking deleted (needed for blob cleanup).
-			fileHash, exists, err := database.GetFileHash(req.RelPath)
+			fileHash, exists, err := database.GetFileHash(req.RelPath, deviceName)
 			if err != nil {
 				log.Printf("DB error looking up %s for deletion: %v", req.RelPath, err)
 				sendDeleteResponse(networkEncoder, false, "server error")
@@ -294,7 +294,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				continue
 			}
 
-			if err := database.MarkDeleted(req.RelPath); err != nil {
+			if err := database.MarkDeleted(req.RelPath, deviceName); err != nil {
 				log.Printf("Failed to mark %s as deleted: %v", req.RelPath, err)
 				sendDeleteResponse(networkEncoder, false, "server error")
 				continue
@@ -319,7 +319,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		// so multiple clients can share files bidirectionally.
 		// -------------------------------------------------------
 		case protocol.CmdListServerFiles:
-			files, err := database.GetAllFiles()
+			files, err := database.GetFilesForDevice(deviceName)
 			if err != nil {
 				log.Printf("Failed to list files for %s: %v", deviceName, err)
 				continue
@@ -328,9 +328,10 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			entries := make([]protocol.ServerFileEntry, len(files))
 			for i, f := range files {
 				entries[i] = protocol.ServerFileEntry{
-					RelPath: f.RelPath,
-					Hash:    f.Hash,
-					Size:    f.Size,
+					RelPath:  f.RelPath,
+					Hash:     f.Hash,
+					Size:     f.Size,
+					DeviceID: f.DeviceID,
 				}
 			}
 
@@ -358,7 +359,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 
 			// If client sent an empty hash, look up the current hash by path.
 			if req.Hash == "" {
-				fileHash, exists, dbErr := database.GetFileHash(req.RelPath)
+				fileHash, exists, dbErr := database.GetFileHash(req.RelPath, deviceName)
 				if dbErr != nil || !exists {
 					log.Printf("No hash found for download request %s from %s", req.RelPath, deviceName)
 					continue
