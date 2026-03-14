@@ -230,6 +230,23 @@
         .badge-local { background: #0d1e3b; color: #4d9eff; border: 1px solid #4d9eff44; }
         .badge-server { background: #2e0d3b; color: #c080ff; border: 1px solid #c080ff44; }
 
+        .device-heading {
+            padding: 8px 16px 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #8899bb;
+            font-weight: 700;
+            background: #1a2444;
+            border-bottom: 1px solid #2a2a4a;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .device-group {
+            border-bottom: 2px solid #2a2a4a;
+        }
+
         .file-actions {
             display: flex;
             gap: 6px;
@@ -422,6 +439,7 @@
     <script>
         // ---- global state ----
         var operationInFlight = false;
+        var currentDeviceName = '';
 
         // ---- helpers ----
 
@@ -507,8 +525,9 @@
             return '';
         }
 
-        function makeBtn(cls, label, action, relPath) {
-            return '<button class="btn ' + cls + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '">' + label + '</button>';
+        function makeBtn(cls, label, action, relPath, deviceId) {
+            var deviceAttr = deviceId ? ' data-device="' + escapeHtml(deviceId) + '"' : '';
+            return '<button class="btn ' + cls + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
         }
 
         function renderLocalRow(f, status) {
@@ -528,21 +547,55 @@
                 '</div>';
         }
 
-        function renderServerRow(f, status) {
+        function groupByDevice(serverFiles) {
+            var groups = {};
+            serverFiles.forEach(function(f) {
+                var device = f.device_id || 'Unknown Device';
+                if (!groups.hasOwnProperty(device)) groups[device] = [];
+                groups[device].push(f);
+            });
+            return groups;
+        }
+
+        function renderServerFileRow(f, localMap, device, isMine) {
             var actions = '';
-            if (status === 'server-only' || status === 'conflict') {
-                actions += makeBtn('btn-pull', '\u2190 Pull', 'download', f.rel_path);
+            actions += makeBtn('btn-pull', 'Pull here', 'pull-device', f.rel_path, device);
+            if (isMine) {
+                actions += makeBtn('btn-delete', 'Remove mine', 'delete-server', f.rel_path);
             }
-            actions += makeBtn('btn-delete', 'Delete', 'delete-server', f.rel_path);
+            var localBadge = localMap.hasOwnProperty(f.rel_path) ? ' \u00B7 <span class="badge badge-synced">local copy</span>' : '';
 
             return '<div class="file-row">' +
                 '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
                 '<div class="file-info">' +
                     '<div class="file-path" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
-                    '<div class="file-meta">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
+                    '<div class="file-meta">' + f.size_human + localBadge + '</div>' +
                 '</div>' +
                 '<div class="file-actions">' + actions + '</div>' +
                 '</div>';
+        }
+
+        function renderServerGroups(serverFiles, localMap) {
+            if (!serverFiles || serverFiles.length === 0) {
+                return '<div class="empty-state">No server files</div>';
+            }
+            var groups = groupByDevice(serverFiles);
+            var deviceNames = Object.keys(groups).sort(function(a, b) {
+                if (a === currentDeviceName) return -1;
+                if (b === currentDeviceName) return 1;
+                return a < b ? -1 : a > b ? 1 : 0;
+            });
+            var html = '';
+            deviceNames.forEach(function(device) {
+                var isMine = (device === currentDeviceName);
+                html += '<div class="device-group">';
+                html += '<div class="device-heading">' + escapeHtml(device) + '</div>';
+                groups[device].forEach(function(f) {
+                    html += renderServerFileRow(f, localMap, device, isMine);
+                });
+                html += '</div>';
+            });
+            return html;
         }
 
         function renderFileLists(clientFiles, serverFiles) {
@@ -552,13 +605,12 @@
             var serverMap = {};
             serverFiles.forEach(function(f) { serverMap[f.rel_path] = f; });
 
-            // Collect all unique rel_paths, sorted alphabetically
+            // Collect all unique rel_paths, sorted alphabetically (for local panel)
             var allPaths = Object.keys(localMap).concat(
                 Object.keys(serverMap).filter(function(p) { return !localMap.hasOwnProperty(p); })
             ).sort();
 
             var localHtml = '';
-            var serverHtml = '';
 
             allPaths.forEach(function(relPath) {
                 var status = computeStatus(localMap, serverMap, relPath);
@@ -566,16 +618,13 @@
                 if (localMap.hasOwnProperty(relPath)) {
                     localHtml += renderLocalRow(localMap[relPath], status);
                 }
-                if (serverMap.hasOwnProperty(relPath)) {
-                    serverHtml += renderServerRow(serverMap[relPath], status);
-                }
             });
 
             var localList = document.getElementById('local-file-list');
             var serverList = document.getElementById('server-file-list');
 
             localList.innerHTML = localHtml || '<div class="empty-state">No local files</div>';
-            serverList.innerHTML = serverHtml || '<div class="empty-state">No server files</div>';
+            serverList.innerHTML = renderServerGroups(serverFiles, localMap);
 
             // Re-apply disabled state if an operation is in flight
             if (operationInFlight) {
@@ -606,6 +655,8 @@
         // ---- status polling ----
 
         function updateStatus(data) {
+            if (data.device_name) currentDeviceName = data.device_name;
+
             // Header connection dot
             var connDot = document.getElementById('conn-dot');
             var connText = document.getElementById('conn-text');
@@ -751,9 +802,34 @@
             }
         }
 
+        async function doDevicePull(relPath, device, btn) {
+            if (operationInFlight) return;
+            operationInFlight = true;
+            var origText = btn.textContent;
+            btn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var resp = await fetch('/api/files/pull?path=' + encodeURIComponent(relPath) + '&from=' + encodeURIComponent(device), { method: 'POST' });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(btn, 'Pulled', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(btn, data.message || 'Pull failed', true);
+                }
+            } catch (e) {
+                showFeedback(btn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                btn.textContent = origText;
+                setButtonsDisabled(false);
+            }
+        }
+
         async function doDeleteServer(relPath, btn) {
             if (operationInFlight) return;
-            if (!confirm('Delete "' + relPath + '" from server?')) return;
+            if (!confirm('Remove your copy of "' + relPath + '" from server? Other devices\' copies are not affected.')) return;
             operationInFlight = true;
             var origText = btn.textContent;
             btn.textContent = '...';
@@ -815,6 +891,7 @@
                 case 'download':     doDownload(path, btn); break;
                 case 'delete-client': doDeleteClient(path, btn); break;
                 case 'delete-server': doDeleteServer(path, btn); break;
+                case 'pull-device': doDevicePull(path, btn.dataset.device, btn); break;
             }
         });
 
