@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-data-layer-04-PLAN.md
-last_updated: "2026-03-14T09:32:18.811Z"
+stopped_at: Completed 02-sync-behavior-03-PLAN.md
+last_updated: "2026-03-14T09:38:42.191Z"
 last_activity: "2026-03-12 — All phases planned (Phase 1: 3 plans, Phase 2: 2 plans, Phase 3: 2 plans)"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 14
 ---
 
@@ -53,6 +53,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 01-data-layer P02 | 2 | 2 tasks | 4 files |
 | Phase 02-sync-behavior P02 | 2 | 2 tasks | 5 files |
 | Phase 01-data-layer P04 | 2 | 2 tasks | 3 files |
+| Phase 02-sync-behavior P03 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,7 @@ Recent decisions affecting current work:
 - [Phase 02-sync-behavior]: PullFile uses two connections: FetchServerFileList to resolve hash by DeviceID, then dedicated download connection
 - [Phase 02-sync-behavior]: CmdRequestFile uses GetFileHashAnyDevice for cross-device pulls; write paths remain device-scoped
 - [Phase 01-data-layer]: PurgeDeletedRecord runs unconditionally in CmdDeleteFile after MarkDeleted; each device's metadata row is removed regardless of other devices' blob references
+- [Phase 02-sync-behavior]: CmdListServerFiles calls GetAllFiles() (not GetFilesForDevice) — manifest is global, write paths stay device-scoped
 
 ### Pending Todos
 
@@ -82,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T09:32:18.808Z
-Stopped at: Completed 01-data-layer-04-PLAN.md
+Last session: 2026-03-14T09:38:42.187Z
+Stopped at: Completed 02-sync-behavior-03-PLAN.md
 Resume file: None
