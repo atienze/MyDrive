@@ -223,6 +223,21 @@ func (db *DB) MarkDeleted(relPath, deviceID string) error {
 	return err
 }
 
+// PurgeDeletedRecord hard-deletes a soft-deleted row from the files table.
+// It only removes rows where deleted=TRUE, so it is safe to call even if the
+// caller is unsure whether MarkDeleted was already called — live rows are never
+// touched. Calling PurgeDeletedRecord on a non-existent row is a no-op.
+func (db *DB) PurgeDeletedRecord(relPath, deviceID string) error {
+	_, err := db.conn.Exec(
+		`DELETE FROM files WHERE rel_path = ? AND device_id = ? AND deleted = TRUE`,
+		relPath, deviceID,
+	)
+	if err != nil {
+		return fmt.Errorf("purge deleted record %s (device %s): %w", relPath, deviceID, err)
+	}
+	return nil
+}
+
 // GetFilesForDevice returns all non-deleted files owned by the given device.
 func (db *DB) GetFilesForDevice(deviceID string) ([]FileRecord, error) {
 	query := `
