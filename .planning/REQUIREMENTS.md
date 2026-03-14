@@ -45,10 +45,10 @@
 
 ### Web UI
 
-- [ ] **WEBU-01**: Server panel groups files by device name (e.g., "MacBook/", "RaspberryPi/")
-- [ ] **WEBU-02**: User can download individual files from any device's listing to local machine
+- [x] **WEBU-01**: Server panel groups files by device name (e.g., "MacBook/", "RaspberryPi/")
+- [x] **WEBU-02**: User can download individual files from any device's listing to local machine
 - [ ] **WEBU-03**: Delete button clarifies "remove from this device" and only deletes the current device's record
-- [ ] **WEBU-04**: Push (upload) button sends files under the current device's ID
+- [x] **WEBU-04**: Push (upload) button sends files under the current device's ID
 
 ## v2 Requirements
 
@@ -98,10 +98,10 @@
 | SYNC-02 | Phase 2 | Complete |
 | SYNC-03 | Phase 2 | Complete |
 | SYNC-04 | Phase 2 | Complete |
-| WEBU-01 | Phase 3 | Pending |
-| WEBU-02 | Phase 3 | Pending |
+| WEBU-01 | Phase 3 | Complete |
+| WEBU-02 | Phase 3 | Complete |
 | WEBU-03 | Phase 3 | Pending |
-| WEBU-04 | Phase 3 | Pending |
+| WEBU-04 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 27 total
