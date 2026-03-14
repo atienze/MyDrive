@@ -126,6 +126,7 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("GET /api/files/server", u.handleServerFileList)
 	mux.HandleFunc("POST /api/files/upload", u.handleUpload)
 	mux.HandleFunc("POST /api/files/download", u.handleDownload)
+	mux.HandleFunc("POST /api/files/pull", u.handlePull)
 	mux.HandleFunc("DELETE /api/files/server", u.handleDeleteServer)
 	mux.HandleFunc("DELETE /api/files/client", u.handleDeleteClient)
 
@@ -245,6 +246,35 @@ func (u *UIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	u.status.AddActivity(fmt.Sprintf("Uploaded %s", relPath))
 	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "uploaded"})
+}
+
+// handlePull downloads a file from a specific device's namespace on the server.
+// POST /api/files/pull?from=<deviceID>&path=<relPath> — acquires syncMu.
+func (u *UIServer) handlePull(w http.ResponseWriter, r *http.Request) {
+	relPath := r.URL.Query().Get("path")
+	if err := validateRelPath(relPath); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	fromDevice := r.URL.Query().Get("from")
+	if fromDevice == "" {
+		writeError(w, http.StatusBadRequest, "from parameter is required")
+		return
+	}
+
+	u.syncMu.Lock()
+	err := syncclient.PullFile(u.cfg, u.st, u.statePath, fromDevice, relPath)
+	u.syncMu.Unlock()
+
+	if err != nil {
+		u.status.AddActivity(fmt.Sprintf("Pull failed: %s from %s: %v", relPath, fromDevice, err))
+		writeError(w, httpStatusFromErr(err), fmt.Sprintf("pull failed: %v", err))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Pulled %s from %s", relPath, fromDevice))
+	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "pulled"})
 }
 
 // handleDownload pulls one file from the server to the local sync directory.
