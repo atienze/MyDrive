@@ -327,9 +327,9 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		// so multiple clients can share files bidirectionally.
 		// -------------------------------------------------------
 		case protocol.CmdListServerFiles:
-			files, err := database.GetFilesForDevice(deviceName)
+			files, err := database.GetAllFiles()
 			if err != nil {
-				log.Printf("Failed to list files for %s: %v", deviceName, err)
+				log.Printf("Failed to list all files (requested by %s): %v", deviceName, err)
 				continue
 			}
 
