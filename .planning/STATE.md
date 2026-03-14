@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-web-ui-01-PLAN.md
-last_updated: "2026-03-14T09:46:56.833Z"
+stopped_at: "Checkpoint 03-02 Task 2: Awaiting human verify of multi-device Web UI"
+last_updated: "2026-03-14T09:53:46.236Z"
 last_activity: "2026-03-12 — All phases planned (Phase 1: 3 plans, Phase 2: 2 plans, Phase 3: 2 plans)"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
   percent: 14
 ---
 
@@ -55,6 +55,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 01-data-layer P04 | 2 | 2 tasks | 3 files |
 | Phase 02-sync-behavior P03 | 5 | 1 tasks | 1 files |
 | Phase 03-web-ui P01 | 2 | 2 tasks | 3 files |
+| Phase 03-web-ui P02 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,8 @@ Recent decisions affecting current work:
 - [Phase 03-web-ui]: DeviceName in Config is optional — no validation added, empty string is valid (device label is user-optional)
 - [Phase 03-web-ui]: handleDownload kept for backward compatibility; handlePull is the new cross-device pull endpoint with from param
 - [Phase 03-web-ui]: DeviceID uses omitempty so client file entries (no DeviceID) serialize cleanly without empty string noise
+- [Phase 03-web-ui]: currentDeviceName populated from /api/status device_name field — no separate fetch needed
+- [Phase 03-web-ui]: Files from other devices show only Pull here; Remove mine appears only when device === currentDeviceName
 
 ### Pending Todos
 
@@ -88,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-14T09:46:56.829Z
-Stopped at: Completed 03-web-ui-01-PLAN.md
+Last session: 2026-03-14T09:53:39.519Z
+Stopped at: Checkpoint 03-02 Task 2: Awaiting human verify of multi-device Web UI
 Resume file: None
