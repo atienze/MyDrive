@@ -33,6 +33,7 @@ type fileEntry struct {
 	Hash      string `json:"hash"`
 	Size      int64  `json:"size"`
 	SizeHuman string `json:"size_human"`
+	DeviceID  string `json:"device_id,omitempty"`
 }
 
 // opResponse is the JSON envelope returned by mutating endpoints.
@@ -216,6 +217,7 @@ func (u *UIServer) handleServerFileList(w http.ResponseWriter, r *http.Request) 
 			Hash:      e.Hash,
 			Size:      e.Size,
 			SizeHuman: status.FormatSize(e.Size),
+			DeviceID:  e.DeviceID,
 		})
 	}
 

@@ -26,6 +26,7 @@ type StatusSnapshot struct {
 	TotalFiles      int             `json:"total_files"`
 	TotalSize       int64           `json:"total_size"`
 	Activities      []ActivityEntry `json:"activities"`
+	DeviceName      string          `json:"device_name,omitempty"`
 }
 
 // Status is the thread-safe shared state between the daemon loop and the UI.
@@ -41,11 +42,19 @@ type Status struct {
 	totalFiles      int
 	totalSize       int64
 	activities      []ActivityEntry
+	deviceName      string
 }
 
 // New creates a new Status instance.
 func New() *Status {
 	return &Status{}
+}
+
+// SetDeviceName stores the device name so it can be surfaced in status snapshots.
+func (s *Status) SetDeviceName(name string) {
+	s.mu.Lock()
+	s.deviceName = name
+	s.mu.Unlock()
 }
 
 // AddActivity prepends an entry to the activity log, capped at 50.
@@ -124,6 +133,7 @@ func (s *Status) Snapshot() StatusSnapshot {
 		TotalFiles:      s.totalFiles,
 		TotalSize:       s.totalSize,
 		Activities:      acts,
+		DeviceName:      s.deviceName,
 	}
 }
 

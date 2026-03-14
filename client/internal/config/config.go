@@ -13,6 +13,7 @@ type Config struct {
 	ServerAddr string `toml:"server_addr"`
 	Token      string `toml:"token"`
 	SyncDir    string `toml:"sync_dir"`
+	DeviceName string `toml:"device_name"`
 }
 
 // ConfigPath returns the absolute path to the config file (~/.vaultsync/config.toml).
