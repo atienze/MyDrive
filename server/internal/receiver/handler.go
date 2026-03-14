@@ -310,6 +310,14 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				}
 			}
 
+			// Hard-delete the metadata row now that it is soft-deleted.
+			// Runs unconditionally — even when the blob is still referenced by other
+			// devices under different paths, THIS device's row should be removed.
+			// The AND deleted=TRUE guard in PurgeDeletedRecord ensures safety.
+			if err := database.PurgeDeletedRecord(req.RelPath, deviceName); err != nil {
+				log.Printf("Warning: failed to purge deleted record %s: %v", req.RelPath, err)
+			}
+
 			log.Printf("Deleted: %s (hash %s, refs remaining: %d)", req.RelPath, fileHash[:12], refCount)
 			sendDeleteResponse(networkEncoder, true, "deleted")
 
