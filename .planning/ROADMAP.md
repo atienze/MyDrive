@@ -22,12 +22,13 @@ The existing single-device sync is fully functional. This milestone transforms t
   3. DB queries for file existence, hash lookup, and deletion are scoped to the querying device
   4. `ServerFileEntry` over the wire carries a DeviceID field
   5. Protocol version reflects the multi-device change
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
 - [ ] 01-01-PLAN.md — Schema migration binary (migrate-v3): composite unique constraint
 - [ ] 01-02-PLAN.md — Protocol changes: ServerFileEntry.DeviceID + Version=3 + handshake version check
 - [ ] 01-03-PLAN.md — DB layer: device-scoped query methods + handler call site updates
+- [ ] 01-04-PLAN.md — Gap closure: hard-delete file metadata rows when no device references a file (DBLR-08)
 
 ### Phase 2: Sync Behavior
 **Goal**: Push sends files under the authenticated device's ID; pull is an explicit user action; deletions only affect the requesting device
@@ -64,6 +65,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Layer | 1/3 | In Progress|  |
+| 1. Data Layer | 3/4 | Gap closure needed |  |
 | 2. Sync Behavior | 2/3 | Gap closure needed | |
 | 3. Web UI | 0/2 | Not started | - |

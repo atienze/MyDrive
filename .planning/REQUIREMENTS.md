@@ -20,16 +20,16 @@
 - [ ] **DBLR-05**: `GetFilesForDevice(deviceID)` returns only that device's files
 - [ ] **DBLR-06**: `GetSharedFiles(excludeDevice)` returns files from all other devices
 - [ ] **DBLR-07**: `HashRefCount` counts references across all devices (unchanged — already correct)
-- [ ] **DBLR-08**: Server removes file metadata records when no device references a file (ref-counted cleanup)
+- [x] **DBLR-08**: Server removes file metadata records when no device references a file (ref-counted cleanup)
 
 ### Server Handler
 
-- [ ] **SRVR-01**: `CmdCheckFile` passes `device_id` to `FileExists` — only checks if this device has the file
-- [ ] **SRVR-02**: `CmdSendFile`/`CmdFileChunk` upserts under the authenticated device's ID
-- [ ] **SRVR-03**: `CmdDeleteFile` passes `device_id` to `MarkDeleted` — only soft-deletes this device's record
-- [ ] **SRVR-04**: `CmdListServerFiles` returns all files with `DeviceID` field so client knows the source
-- [ ] **SRVR-05**: Blob cleanup via `HashRefCount` remains correct across multi-device references
-- [ ] **SRVR-06**: `CmdRequestFile` can serve files from any device's storage (for cross-device pull)
+- [x] **SRVR-01**: `CmdCheckFile` passes `device_id` to `FileExists` — only checks if this device has the file
+- [x] **SRVR-02**: `CmdSendFile`/`CmdFileChunk` upserts under the authenticated device's ID
+- [x] **SRVR-03**: `CmdDeleteFile` passes `device_id` to `MarkDeleted` — only soft-deletes this device's record
+- [x] **SRVR-04**: `CmdListServerFiles` returns all files with `DeviceID` field so client knows the source
+- [x] **SRVR-05**: Blob cleanup via `HashRefCount` remains correct across multi-device references
+- [x] **SRVR-06**: `CmdRequestFile` can serve files from any device's storage (for cross-device pull)
 
 ### Protocol
 
@@ -85,15 +85,15 @@
 | DBLR-05 | Phase 1 | Pending |
 | DBLR-06 | Phase 1 | Pending |
 | DBLR-07 | Phase 1 | Pending |
-| DBLR-08 | Phase 1 | Pending |
+| DBLR-08 | Phase 1 | Complete |
 | PROT-01 | Phase 1 | Complete |
 | PROT-02 | Phase 1 | Complete |
-| SRVR-01 | Phase 2 | Pending |
-| SRVR-02 | Phase 2 | Pending |
-| SRVR-03 | Phase 2 | Pending |
-| SRVR-04 | Phase 2 | Pending |
-| SRVR-05 | Phase 2 | Pending |
-| SRVR-06 | Phase 2 | Pending |
+| SRVR-01 | Phase 2 | Complete |
+| SRVR-02 | Phase 2 | Complete |
+| SRVR-03 | Phase 2 | Complete |
+| SRVR-04 | Phase 2 | Complete |
+| SRVR-05 | Phase 2 | Complete |
+| SRVR-06 | Phase 2 | Complete |
 | SYNC-01 | Phase 2 | Complete |
 | SYNC-02 | Phase 2 | Complete |
 | SYNC-03 | Phase 2 | Complete |
