@@ -233,4 +233,72 @@ func TestBlobCleanupAfterAllDevicesDelete(t *testing.T) {
 	if count != 0 {
 		t.Errorf("expected ref count 0 after all deletes, got %d", count)
 	}
+
+	// Extended: after purging both rows, no rows remain for this hash at all.
+	if err := d.PurgeDeletedRecord("f1.txt", "device-A"); err != nil {
+		t.Fatalf("PurgeDeletedRecord device-A: %v", err)
+	}
+	if err := d.PurgeDeletedRecord("f2.txt", "device-B"); err != nil {
+		t.Fatalf("PurgeDeletedRecord device-B: %v", err)
+	}
+
+	var rawCount int
+	if err := d.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE hash = 'deadhash'`).Scan(&rawCount); err != nil {
+		t.Fatalf("raw count query: %v", err)
+	}
+	if rawCount != 0 {
+		t.Errorf("expected 0 rows after purge, got %d (soft-deleted rows still linger)", rawCount)
+	}
+}
+
+func TestPurgeDeletedRecord(t *testing.T) {
+	d := openTestDB(t)
+
+	// Setup: insert and soft-delete a file for device-A.
+	if err := d.UpsertFile("purge.txt", "purgeme", "device-A", 100); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	if err := d.MarkDeleted("purge.txt", "device-A"); err != nil {
+		t.Fatalf("MarkDeleted: %v", err)
+	}
+
+	// Purge the soft-deleted row.
+	if err := d.PurgeDeletedRecord("purge.txt", "device-A"); err != nil {
+		t.Fatalf("PurgeDeletedRecord: %v", err)
+	}
+
+	// Row must be physically gone — query without deleted filter.
+	var count int
+	if err := d.conn.QueryRow(
+		`SELECT COUNT(*) FROM files WHERE rel_path = ? AND device_id = ?`,
+		"purge.txt", "device-A",
+	).Scan(&count); err != nil {
+		t.Fatalf("raw count: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected row to be physically removed, got count=%d", count)
+	}
+
+	// Idempotent: calling again on the now-absent row must not error.
+	if err := d.PurgeDeletedRecord("purge.txt", "device-A"); err != nil {
+		t.Errorf("PurgeDeletedRecord idempotent call failed: %v", err)
+	}
+
+	// Safety: PurgeDeletedRecord must NOT remove a non-deleted (live) row.
+	if err := d.UpsertFile("live.txt", "livehash", "device-A", 50); err != nil {
+		t.Fatalf("upsert live: %v", err)
+	}
+	if err := d.PurgeDeletedRecord("live.txt", "device-A"); err != nil {
+		t.Fatalf("PurgeDeletedRecord on live row: %v", err)
+	}
+	var liveCount int
+	if err := d.conn.QueryRow(
+		`SELECT COUNT(*) FROM files WHERE rel_path = ? AND device_id = ?`,
+		"live.txt", "device-A",
+	).Scan(&liveCount); err != nil {
+		t.Fatalf("live count: %v", err)
+	}
+	if liveCount != 1 {
+		t.Errorf("expected live row to be untouched, got count=%d", liveCount)
+	}
 }
