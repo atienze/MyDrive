@@ -1,6 +1,7 @@
 .DS_Store
 server/uploads/
 config.toml
+CLAUDE.md
 
 # Content-addressable object store (contains synced file blobs)
 VaultData/

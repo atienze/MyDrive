@@ -192,6 +192,11 @@ func DownloadSingleFile(cfg *config.Config, st *state.LocalState, statePath, rel
 		return fmt.Errorf("decode file data header: %w", err)
 	}
 
+	// Empty hash signals "file not found" from the server.
+	if header.Hash == "" {
+		return fmt.Errorf("file not found on server: %s", relPath)
+	}
+
 	// Create parent directories and temp file.
 	fullPath := filepath.Join(cfg.SyncDir, relPath)
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
@@ -293,6 +298,16 @@ func DeleteServerFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 		return fmt.Errorf("server rejected delete: %s", resp.Message)
 	}
 
+	// Also remove the local file to prevent re-upload on next sync.
+	// Without this, the file stays on disk, the next sync detects it,
+	// the server says "need it" (record was purged), and it gets re-uploaded.
+	fullPath := filepath.Join(cfg.SyncDir, relPath)
+	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove local copy after server delete: %w", err)
+	}
+	// Clean up empty parent directories left behind.
+	cleanEmptyDirs(filepath.Dir(fullPath), cfg.SyncDir)
+
 	st.RemoveFile(relPath)
 	if err := st.Save(statePath); err != nil {
 		return fmt.Errorf("persist state after delete: %w", err)
@@ -358,6 +373,11 @@ func PullFile(cfg *config.Config, st *state.LocalState, statePath, fromDevice, r
 	var header protocol.FileDataHeader
 	if err := gob.NewDecoder(bytes.NewBuffer(hdrPacket.Payload)).Decode(&header); err != nil {
 		return fmt.Errorf("decode file data header: %w", err)
+	}
+
+	// Empty hash signals "file not found" from the server.
+	if header.Hash == "" {
+		return fmt.Errorf("file not found on server: %s (device %s)", relPath, fromDevice)
 	}
 
 	// Create parent directories and temp file.

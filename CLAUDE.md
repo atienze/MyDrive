@@ -12,7 +12,7 @@ This is a Go workspace project (go 1.25.6). Always run builds from the repo root
 
 ```bash
 # Build
-GOOS=linux GOARCH=arm64 go build -o vault-sync-server ./server/cmd
+GOOS=linux GOARCH=amd64 go build -o vault-sync-server ./server/cmd
 go build -o vault-sync ./client/cmd
 
 # Run server (listens on :9000)

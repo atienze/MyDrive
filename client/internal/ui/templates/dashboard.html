@@ -559,11 +559,14 @@
 
         function renderServerFileRow(f, localMap, device, isMine) {
             var actions = '';
-            actions += makeBtn('btn-pull', 'Pull here', 'pull-device', f.rel_path, device);
-            if (isMine) {
-                actions += makeBtn('btn-delete', 'Remove mine', 'delete-server', f.rel_path);
+            var alreadyLocal = localMap.hasOwnProperty(f.rel_path) && localMap[f.rel_path].hash === f.hash;
+            if (!alreadyLocal) {
+                actions += makeBtn('btn-pull', 'Pull here', 'pull-device', f.rel_path, device);
             }
-            var localBadge = localMap.hasOwnProperty(f.rel_path) ? ' \u00B7 <span class="badge badge-synced">local copy</span>' : '';
+            if (isMine) {
+                actions += makeBtn('btn-delete', 'Remove', 'delete-server', f.rel_path);
+            }
+            var localBadge = alreadyLocal ? ' \u00B7 <span class="badge badge-synced">local copy</span>' : '';
 
             return '<div class="file-row">' +
                 '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
@@ -829,7 +832,7 @@
 
         async function doDeleteServer(relPath, btn) {
             if (operationInFlight) return;
-            if (!confirm('Remove your copy of "' + relPath + '" from server? Other devices\' copies are not affected.')) return;
+            if (!confirm('Delete "' + relPath + '" from server and local disk? Other devices\' copies are not affected.')) return;
             operationInFlight = true;
             var origText = btn.textContent;
             btn.textContent = '...';

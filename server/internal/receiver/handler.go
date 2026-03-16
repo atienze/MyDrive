@@ -371,6 +371,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				fileHash, _, ok, dbErr := database.GetFileHashAnyDevice(req.RelPath)
 				if dbErr != nil || !ok {
 					log.Printf("No hash found for download request %s from %s", req.RelPath, deviceName)
+					sendErrorHeader(networkEncoder, req.RelPath)
 					continue
 				}
 				req.Hash = fileHash
@@ -378,6 +379,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 
 			if !objectStore.HasObject(req.Hash) {
 				log.Printf("Requested blob missing for %s (hash %s)", req.RelPath, req.Hash[:12])
+				sendErrorHeader(networkEncoder, req.RelPath)
 				continue
 			}
 
@@ -430,6 +432,21 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			log.Printf("Sent file to %s: %s (%d bytes)", deviceName, req.RelPath, info.Size())
 		}
 	}
+}
+
+// sendErrorHeader sends a FileDataHeader with an empty hash to signal "file not found"
+// to the client. Without this, the client blocks waiting for a response that never comes.
+func sendErrorHeader(encoder *protocol.Encoder, relPath string) {
+	var buf bytes.Buffer
+	gob.NewEncoder(&buf).Encode(protocol.FileDataHeader{
+		RelPath: relPath,
+		Hash:    "",
+		Size:    0,
+	})
+	encoder.Encode(protocol.Packet{
+		Cmd:     protocol.CmdFileDataHeader,
+		Payload: buf.Bytes(),
+	})
 }
 
 // sendDeleteResponse encodes and sends a DeleteFileResponse packet.

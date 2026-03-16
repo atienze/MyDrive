@@ -1,0 +1,92 @@
+Magic number is hardcoded in CLAUDE.md. Make sure its not later.
+
+Multi-Device Support Analysis
+What Exists Today
+The current design is single-device-wins with a global namespace:
+
+db.go:76 — rel_path TEXT NOT NULL UNIQUE means one record per path, globally
+device_id is stored but purely informational — it's not part of any constraint
+handler.go:312 — GetAllFiles() returns everything unfiltered; all clients see the same view
+handler.go:287 — MarkDeleted(relPath) is global; Device A deleting a file nukes it for Device B too
+What Needs to Change
+1. Schema — the foundation (small but migration-critical)
+
+
+-- Change unique constraint from (rel_path) to (rel_path, device_id)
+CREATE UNIQUE INDEX idx_files_path_device ON files(rel_path, device_id);
+This lets Device A have docs/notes.txt → hash_X while Device B has docs/notes.txt → hash_Y. Each device owns its own file manifest.
+
+Need a migration (you already have server/cmd/migrate/) to:
+
+Drop the old UNIQUE on rel_path
+Add the composite unique index
+Existing rows keep their current device_id — no data loss
+2. DB layer (~8 function signatures change)
+
+Function	Current	Multi-device
+UpsertFile	ON CONFLICT(rel_path)	ON CONFLICT(rel_path, device_id)
+FileExists	checks path+hash globally	adds AND device_id = ?
+GetFileHash	global lookup	needs device_id param
+MarkDeleted	global WHERE rel_path = ?	WHERE rel_path = ? AND device_id = ?
+GetAllFiles	returns everything	split into two: GetFilesForDevice(id) and GetAllFiles() (for cross-device discovery)
+HashRefCount	counts across all devices	stays the same — this is already correct for blob safety
+New function needed: GetSharedFiles(excludeDevice) — returns files from other devices for the download phase.
+
+3. Server handler (moderate — ~6 touch points in handler.go)
+
+Every command already has deviceName in scope from auth. The changes:
+
+CmdCheckFile: pass device_id to FileExists — only check if this device already has the file
+CmdSendFile/CmdFileChunk: already passes deviceName to UpsertFile — just needs the new ON CONFLICT to work
+CmdDeleteFile: pass device_id to MarkDeleted — only soft-delete this device's record. Blob cleanup via HashRefCount already checks all devices.
+CmdListServerFiles: decision point — either:
+(a) Return only the requesting device's files (simple, current behavior equivalent), OR
+(b) Return all files with a DeviceID field so the client knows the source (needed for cross-device sync)
+Option (b) is what you'd want. Requires adding DeviceID string to protocol.ServerFileEntry.
+
+4. Protocol (minor)
+
+
+type ServerFileEntry struct {
+    RelPath  string
+    Hash     string
+    Size     int64
+    DeviceID string // NEW — which device uploaded this
+}
+No new commands needed. The existing command set covers all operations.
+
+5. Client sync logic (the hardest part conceptually)
+
+Currently bidirectional.go assumes a single global truth. Multi-device changes the download phase significantly:
+
+Upload phase: mostly unchanged — client pushes its files, server records them under this device's ID
+Download phase: server returns files from all devices. Client needs to decide:
+Files from other devices that don't exist locally → download (new cross-device sync)
+Files that exist locally with a different hash → conflict resolution policy
+Files deleted by another device → do nothing (each device owns its own deletions)
+Deletion semantics: Device A deleting foo.txt only removes Device A's record. Device B still sees its own foo.txt. The blob survives as long as any device references it.
+The state.json on each client needs no structural change — it already tracks relPath → hash for the local device.
+
+6. Web UI (minor)
+
+File list could show which device uploaded each file
+Delete button should clarify "delete from this device" vs "delete everywhere"
+Scope Estimate
+Area	Effort	Files touched
+Schema migration	Small	db.go, new migration script
+DB layer functions	Medium	db.go (~8 functions)
+Server handler	Medium	handler.go (~6 switch cases)
+Protocol types	Small	packet.go (1 struct)
+Client sync logic	Medium-Large	bidirectional.go, operations.go
+Web UI	Small	server.go, dashboard.html
+Tests	Medium	New multi-device test scenarios
+Total: ~3-5 focused sessions of work. The code changes aren't massive — most are adding a device_id parameter to existing functions. The real complexity is in the design decisions:
+
+What does a device see by default? Only its own files, or the union of all devices?
+Cross-device conflict resolution: if two devices have the same path with different content, which version does a third device get?
+"Delete everywhere" vs "delete from my device": do you need both operations, or just one?
+If you go with "each device sees the union of all files, last-writer-wins on conflicts, delete is per-device" — that's the simplest model and the most consistent with how the current system already works. It's also the closest to how something like Syncthing handles multi-device.
+
+
+Implement the text above and consider fully removing bidirectional sync. It confuses what I want on certain systems. Maybe I don't want some files on a specific system and bidirectional sync will automate what I don't want. 
+
