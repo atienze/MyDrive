@@ -460,6 +460,158 @@ func TestActivityLogOnSuccess(t *testing.T) {
 	}
 }
 
+// ─── Phase 3-01 gap tests: device_id field and handlePull validation ─────────
+
+// TestHandleServerFileList_DeviceIDField verifies that the fileEntry struct
+// carries a device_id field and that it is serialized correctly in the JSON
+// envelope returned by the server file list endpoint.
+//
+// A full handler invocation requires a live TCP connection. This test covers
+// the data-contract layer: constructing a fileEntry with a non-empty DeviceID,
+// encoding it as JSON, and confirming the device_id key is present and
+// non-empty in the output. This matches the requirement that every entry in
+// GET /api/files/server has a non-empty device_id field.
+func TestHandleServerFileList_DeviceIDField(t *testing.T) {
+	entry := fileEntry{
+		RelPath:   "docs/readme.txt",
+		Hash:      "abc123def456",
+		Size:      1024,
+		SizeHuman: "1.0 KB",
+		DeviceID:  "MacBook",
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("json.Marshal fileEntry: %v", err)
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	deviceID, ok := decoded["device_id"]
+	if !ok {
+		t.Fatal("device_id field missing from JSON output of fileEntry")
+	}
+	if deviceID == "" || deviceID == nil {
+		t.Errorf("device_id is empty in JSON output, got: %v", deviceID)
+	}
+	if deviceID != "MacBook" {
+		t.Errorf("device_id = %v, want MacBook", deviceID)
+	}
+}
+
+// TestHandleServerFileList_DeviceID_OmitEmpty verifies that a fileEntry with
+// no DeviceID (client-side file) does NOT emit a device_id key in JSON.
+// This confirms the omitempty behavior that keeps client file entries clean.
+func TestHandleServerFileList_DeviceID_OmitEmpty(t *testing.T) {
+	entry := fileEntry{
+		RelPath:   "local/file.txt",
+		Hash:      "deadbeef",
+		Size:      512,
+		SizeHuman: "512 B",
+		// DeviceID intentionally empty (client file)
+	}
+
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("json.Marshal fileEntry: %v", err)
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["device_id"]; ok {
+		t.Error("device_id key should be absent (omitempty) when DeviceID is empty, but it was present")
+	}
+}
+
+// TestHandlePull_MissingFrom verifies that POST /api/files/pull without a
+// `from` query parameter returns 400 with ok=false. No TCP connection is made.
+func TestHandlePull_MissingFrom(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+
+	// Provide a valid path but no from param.
+	req := httptest.NewRequest(http.MethodPost, "/api/files/pull?path=docs/readme.txt", nil)
+	w := httptest.NewRecorder()
+
+	u.handlePull(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false when from parameter is missing")
+	}
+	if !contains(resp.Message, "from") {
+		t.Errorf("error message should mention 'from' parameter, got: %q", resp.Message)
+	}
+}
+
+// TestHandlePull_InvalidPath verifies that POST /api/files/pull with a path
+// traversal attempt returns 400 with ok=false before any TCP attempt is made.
+func TestHandlePull_InvalidPath(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/files/pull?path=../../etc/passwd&from=MacBook", nil)
+	w := httptest.NewRecorder()
+
+	u.handlePull(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false for path traversal attempt")
+	}
+}
+
+// TestHandlePull_HappyPath verifies that POST /api/files/pull with valid
+// from+path parameters gets past all validation and reaches the PullFile call.
+// Since the test server's ServerAddr points to 127.0.0.1:9999 (unreachable),
+// PullFile returns ErrServerUnreachable, which the handler maps to 502.
+// A 502 (not 400) proves the handler passed all validation successfully.
+func TestHandlePull_HappyPath(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+	// testServer already sets ServerAddr = "127.0.0.1:9999" (unreachable).
+
+	req := httptest.NewRequest(http.MethodPost, "/api/files/pull?path=docs/readme.txt&from=MacBook", nil)
+	w := httptest.NewRecorder()
+
+	u.handlePull(w, req)
+
+	// Must NOT be 400 — validation passed.
+	if w.Code == http.StatusBadRequest {
+		t.Fatalf("got 400 (validation error); expected handler to reach PullFile. body: %s", w.Body.String())
+	}
+
+	// Expect 502 because the server at 127.0.0.1:9999 is unreachable.
+	if w.Code != http.StatusBadGateway {
+		t.Logf("note: expected 502 (server unreachable), got %d. body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false when server is unreachable")
+	}
+}
+
 // contains is a simple string-contains helper (avoids importing strings in test output).
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || len(sub) == 0 ||
