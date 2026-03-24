@@ -22,16 +22,16 @@
             <!-- Navigation -->
             <div>
                 <div class="text-[10px] uppercase tracking-widest text-[#556] px-4 pt-4 pb-2">Navigation</div>
-                <nav class="flex flex-col gap-0.5 px-2">
-                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer bg-[#1a1a2e]">
+                <nav id="sidebar-nav" class="flex flex-col gap-0.5 px-2">
+                    <div data-view="all" onclick="switchView('all')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer bg-[#1a1a2e]">
                         <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
                         All Files
                     </div>
-                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
+                    <div data-view="local" onclick="switchView('local')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
                         <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
                         Local Files
                     </div>
-                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
+                    <div data-view="server" onclick="switchView('server')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
                         <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
                         Server Files
                     </div>
@@ -48,7 +48,7 @@
 
             <!-- Header bar -->
             <header class="h-14 bg-[#16213e] border-b border-[#2a2a4a] flex items-center justify-between px-4 shrink-0">
-                <div class="text-lg font-semibold">All Files</div>
+                <div id="header-title" class="text-lg font-semibold">All Files</div>
                 <div class="flex items-center gap-4">
                     <!-- Sync stats -->
                     <div class="text-xs text-[#888] hidden sm:flex items-center gap-1.5">
@@ -102,25 +102,25 @@
                 </div>
 
                 <!-- File browser two-panel grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div id="file-panels" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                     <!-- Left panel: local files -->
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
+                    <div id="local-panel" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
                         <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
                             <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Local</div>
                             <div class="text-[11px] text-[#556] mt-0.5 font-mono" id="local-path">~/VaultDrive</div>
                         </div>
-                        <div class="max-h-[480px] overflow-y-auto" id="local-file-list">
-                            <div class="py-6 px-4 text-center text-[#556] text-[13px] italic">Loading...</div>
+                        <div id="local-file-list" class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                            <div class="col-span-full py-6 text-center text-[#556] text-[13px] italic">Loading...</div>
                         </div>
                     </div>
 
                     <!-- Right panel: server files -->
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
+                    <div id="server-panel" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
                         <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
                             <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Server</div>
                             <div class="text-[11px] text-[#556] mt-0.5 font-mono">Remote storage</div>
                         </div>
-                        <div class="max-h-[480px] overflow-y-auto" id="server-file-list">
+                        <div id="server-file-list">
                             <div class="py-6 px-4 text-center text-[#556] text-[13px] italic">Loading...</div>
                         </div>
                     </div>
@@ -141,6 +141,52 @@
         // ---- global state ----
         var operationInFlight = false;
         var currentDeviceName = '';
+
+        // ---- Tailwind button class constants ----
+        // ---- view switching ----
+        var currentView = 'all';
+
+        function switchView(view) {
+            currentView = view;
+            var titles = { all: 'All Files', local: 'Local Files', server: 'Server Files' };
+            document.getElementById('header-title').textContent = titles[view];
+
+            var localPanel = document.getElementById('local-panel');
+            var serverPanel = document.getElementById('server-panel');
+            var grid = document.getElementById('file-panels');
+
+            localPanel.classList.remove('hidden');
+            serverPanel.classList.remove('hidden');
+
+            if (view === 'all') {
+                grid.classList.remove('lg:grid-cols-1');
+                grid.classList.add('lg:grid-cols-2');
+            } else if (view === 'local') {
+                serverPanel.classList.add('hidden');
+                grid.classList.remove('lg:grid-cols-2');
+                grid.classList.add('lg:grid-cols-1');
+            } else {
+                localPanel.classList.add('hidden');
+                grid.classList.remove('lg:grid-cols-2');
+                grid.classList.add('lg:grid-cols-1');
+            }
+
+            // Update sidebar active state
+            var navItems = document.querySelectorAll('#sidebar-nav > div');
+            navItems.forEach(function(item) {
+                if (item.dataset.view === view) {
+                    item.className = item.className.replace('hover:bg-[#1a1a2e]', '').replace(/\s+/g, ' ').trim();
+                    if (item.className.indexOf('bg-[#1a1a2e]') === -1) {
+                        item.className += ' bg-[#1a1a2e]';
+                    }
+                } else {
+                    item.className = item.className.replace('bg-[#1a1a2e]', '').replace(/\s+/g, ' ').trim();
+                    if (item.className.indexOf('hover:bg-[#1a1a2e]') === -1) {
+                        item.className += ' hover:bg-[#1a1a2e]';
+                    }
+                }
+            });
+        }
 
         // ---- Tailwind button class constants ----
         var BTN_BASE = 'px-2.5 py-1 rounded text-[11px] font-medium cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
@@ -239,20 +285,23 @@
             return '<button class="' + btnClass + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
         }
 
-        function renderLocalRow(f, status) {
+        function renderLocalCard(f, status) {
             var actions = '';
             if (status === 'local-only' || status === 'conflict') {
                 actions += makeBtn('btn-push', 'Push \u2192', 'upload', f.rel_path);
             }
             actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
 
-            return '<div class="px-4 py-2.5 border-b border-[#1e2a4a] last:border-b-0 flex items-center gap-2.5 text-[13px] transition-colors hover:bg-[#1e2a4a]">' +
-                '<span class="text-sm shrink-0 w-[18px] text-center">' + fileIcon(f.rel_path) + '</span>' +
-                '<div class="flex-1 min-w-0">' +
-                    '<div class="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis text-[#d0d8f0]" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
-                    '<div class="text-[11px] text-[#666] mt-0.5 flex items-center gap-2">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
+            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
+                '<div class="flex items-center gap-2 min-w-0">' +
+                    '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
+                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</span>' +
                 '</div>' +
-                '<div class="flex gap-1.5 shrink-0">' + actions + '</div>' +
+                '<div class="flex items-center gap-2">' +
+                    '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
+                    badgeHtml(status) +
+                '</div>' +
+                '<div class="flex gap-1.5 mt-auto">' + actions + '</div>' +
                 '</div>';
         }
 
@@ -266,7 +315,7 @@
             return groups;
         }
 
-        function renderServerFileRow(f, localMap, device, isMine) {
+        function renderServerCard(f, localMap, device, isMine) {
             var actions = '';
             var alreadyLocal = localMap.hasOwnProperty(f.rel_path) && localMap[f.rel_path].hash === f.hash;
             if (!alreadyLocal) {
@@ -275,15 +324,18 @@
             if (isMine) {
                 actions += makeBtn('btn-delete', 'Remove', 'delete-server', f.rel_path);
             }
-            var localBadge = alreadyLocal ? ' \u00B7 <span class="inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">local copy</span>' : '';
+            var localBadge = alreadyLocal ? '<span class="inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">local copy</span>' : '';
 
-            return '<div class="px-4 py-2.5 border-b border-[#1e2a4a] last:border-b-0 flex items-center gap-2.5 text-[13px] transition-colors hover:bg-[#1e2a4a]">' +
-                '<span class="text-sm shrink-0 w-[18px] text-center">' + fileIcon(f.rel_path) + '</span>' +
-                '<div class="flex-1 min-w-0">' +
-                    '<div class="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis text-[#d0d8f0]" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
-                    '<div class="text-[11px] text-[#666] mt-0.5 flex items-center gap-2">' + f.size_human + localBadge + '</div>' +
+            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
+                '<div class="flex items-center gap-2 min-w-0">' +
+                    '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
+                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</span>' +
                 '</div>' +
-                '<div class="flex gap-1.5 shrink-0">' + actions + '</div>' +
+                '<div class="flex items-center gap-2">' +
+                    '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
+                    localBadge +
+                '</div>' +
+                '<div class="flex gap-1.5 mt-auto">' + actions + '</div>' +
                 '</div>';
         }
 
@@ -302,9 +354,11 @@
                 var isMine = (device === currentDeviceName);
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
                 html += '<div class="px-4 py-2 pt-2 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1]">' + escapeHtml(device) + '</div>';
+                html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
                 groups[device].forEach(function(f) {
-                    html += renderServerFileRow(f, localMap, device, isMine);
+                    html += renderServerCard(f, localMap, device, isMine);
                 });
+                html += '</div>';
                 html += '</div>';
             });
             return html;
@@ -328,14 +382,14 @@
                 var status = computeStatus(localMap, serverMap, relPath);
 
                 if (localMap.hasOwnProperty(relPath)) {
-                    localHtml += renderLocalRow(localMap[relPath], status);
+                    localHtml += renderLocalCard(localMap[relPath], status);
                 }
             });
 
             var localList = document.getElementById('local-file-list');
             var serverList = document.getElementById('server-file-list');
 
-            localList.innerHTML = localHtml || '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No local files</div>';
+            localList.innerHTML = localHtml || '<div class="col-span-full py-8 px-6 text-center text-[#556] text-[13px]">No local files</div>';
             serverList.innerHTML = renderServerGroups(serverFiles, localMap);
 
             // Re-apply disabled state if an operation is in flight
@@ -469,12 +523,12 @@
 
         // ---- per-file operations ----
 
-        // Show inline feedback on the row containing the clicked button
+        // Show inline feedback on the card containing the clicked button
         function showFeedback(btn, msg, isError) {
-            var row = btn.closest('div.flex.items-center');
-            if (!row) return;
-            var existing = row.querySelector('.text-[\\#00d26a], .text-[\\#f24c4c]');
-            if (existing && (existing.classList.contains('text-[11px]')) && existing.tagName === 'SPAN') existing.remove();
+            var card = btn.closest('[data-card]');
+            if (!card) return;
+            var existing = card.querySelector('[data-feedback]');
+            if (existing) existing.remove();
             var span = document.createElement('span');
             span.className = isError ? 'text-[11px] text-[#f24c4c] py-0.5' : 'text-[11px] text-[#00d26a] py-0.5';
             span.textContent = msg;
