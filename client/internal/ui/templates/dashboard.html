@@ -109,6 +109,7 @@
                             <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Local</div>
                             <div class="text-[11px] text-[#556] mt-0.5 font-mono" id="local-path">~/VaultDrive</div>
                         </div>
+                        <div id="local-breadcrumb"></div>
                         <div id="local-file-list" class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                             <div class="col-span-full py-6 text-center text-[#556] text-[13px]">Loading...</div>
                         </div>
@@ -141,6 +142,14 @@
         // ---- global state ----
         var operationInFlight = false;
         var currentDeviceName = '';
+
+        // ---- directory navigation state ----
+        var localCurrentPath = '';   // '' = root
+        var serverCurrentPaths = {}; // keyed by device name, '' = root per device
+        var cachedClientFiles = [];
+        var cachedServerFiles = [];
+        var cachedLocalMap = {};
+        var cachedServerMap = {};
 
         // ---- Tailwind button class constants ----
         // ---- view switching ----
@@ -246,6 +255,123 @@
             return icons[ext] || '\uD83D\uDCC4';
         }
 
+        // ---- directory browsing helpers ----
+
+        function getEntriesAtPath(files, currentPath) {
+            var folderSet = {};
+            var filesAtLevel = [];
+            files.forEach(function(f) {
+                if (currentPath === '' || f.rel_path.indexOf(currentPath) === 0) {
+                    var remainder = currentPath === '' ? f.rel_path : f.rel_path.substring(currentPath.length);
+                    var slashIdx = remainder.indexOf('/');
+                    if (slashIdx !== -1) {
+                        folderSet[remainder.substring(0, slashIdx)] = true;
+                    } else {
+                        filesAtLevel.push(f);
+                    }
+                }
+            });
+            var folders = Object.keys(folderSet).sort();
+            return { folders: folders, files: filesAtLevel };
+        }
+
+        function folderFileCount(files, folderPath) {
+            var count = 0;
+            files.forEach(function(f) {
+                if (f.rel_path.indexOf(folderPath) === 0) count++;
+            });
+            return count;
+        }
+
+        function breadcrumbHtml(currentPath, panel, device) {
+            if (currentPath === '') return '';
+            var parts = currentPath.split('/').filter(function(s) { return s !== ''; });
+            var html = '<div class="text-[12px] font-mono flex items-center gap-1 flex-wrap px-4 py-2 bg-[#0f1a2e] border-b border-[#2a2a4a]">';
+            if (panel === 'local') {
+                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'\')">Root</span>';
+            } else {
+                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(device) + '\', \'\')">Root</span>';
+            }
+            var accumulated = '';
+            for (var i = 0; i < parts.length; i++) {
+                accumulated += parts[i] + '/';
+                html += '<span class="text-[#556]">/</span>';
+                if (i < parts.length - 1) {
+                    if (panel === 'local') {
+                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
+                    } else {
+                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(device) + '\', \'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
+                    }
+                } else {
+                    html += '<span class="text-[#d0d8f0]">' + escapeHtml(parts[i]) + '</span>';
+                }
+            }
+            html += '</div>';
+            return html;
+        }
+
+        function renderFolderCard(folderName, fileCount, onclick) {
+            var label = fileCount === 1 ? '1 file' : fileCount + ' files';
+            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors cursor-pointer" onclick="' + onclick + '">' +
+                '<div class="flex items-center gap-2 min-w-0">' +
+                    '<span class="shrink-0 w-6 flex justify-center"><svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>' +
+                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">' + escapeHtml(folderName) + '</span>' +
+                '</div>' +
+                '<div class="flex items-center gap-2">' +
+                    '<span class="text-[11px] text-[#666]">' + label + '</span>' +
+                '</div>' +
+                '</div>';
+        }
+
+        // ---- navigation functions ----
+
+        function navToLocal(path) {
+            localCurrentPath = path;
+            rerenderLocal();
+        }
+
+        function navToServer(device, path) {
+            serverCurrentPaths[device] = path;
+            rerenderServer();
+        }
+
+        function rerenderLocal() {
+            var entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
+            var bcHtml = breadcrumbHtml(localCurrentPath, 'local');
+            document.getElementById('local-breadcrumb').innerHTML = bcHtml;
+
+            var html = '';
+            entries.folders.forEach(function(folderName) {
+                var folderPath = localCurrentPath + folderName + '/';
+                var count = folderFileCount(cachedClientFiles, folderPath);
+                html += renderFolderCard(folderName, count, "navToLocal('" + escapeHtml(folderPath) + "')");
+            });
+            entries.files.forEach(function(f) {
+                var status = computeStatus(cachedLocalMap, cachedServerMap, f.rel_path);
+                var displayName = f.rel_path.substring(localCurrentPath.length);
+                html += renderLocalCard(f, status, displayName);
+            });
+
+            var localList = document.getElementById('local-file-list');
+            if (!html) {
+                if (cachedClientFiles.length === 0) {
+                    localList.innerHTML = emptyStateHtml('local');
+                } else {
+                    localList.innerHTML = '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
+                }
+            } else {
+                localList.innerHTML = html;
+            }
+
+            if (operationInFlight) setButtonsDisabled(true);
+        }
+
+        function rerenderServer() {
+            var serverList = document.getElementById('server-file-list');
+            serverList.innerHTML = renderServerGroups(cachedServerFiles, cachedLocalMap);
+            if (operationInFlight) setButtonsDisabled(true);
+        }
+
         // ---- disable/enable all action buttons ----
 
         function setButtonsDisabled(disabled) {
@@ -285,7 +411,8 @@
             return '<button class="' + btnClass + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
         }
 
-        function renderLocalCard(f, status) {
+        function renderLocalCard(f, status, displayName) {
+            var visibleName = displayName || f.rel_path;
             var actions = '';
             if (status === 'local-only' || status === 'conflict') {
                 actions += makeBtn('btn-push', 'Push \u2192', 'upload', f.rel_path);
@@ -295,7 +422,7 @@
             return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
                     '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
-                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</span>' +
+                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
                 '<div class="flex items-center gap-2">' +
                     '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
@@ -315,7 +442,8 @@
             return groups;
         }
 
-        function renderServerCard(f, localMap, device, isMine) {
+        function renderServerCard(f, localMap, device, isMine, displayName) {
+            var visibleName = displayName || f.rel_path;
             var actions = '';
             var alreadyLocal = localMap.hasOwnProperty(f.rel_path) && localMap[f.rel_path].hash === f.hash;
             if (!alreadyLocal) {
@@ -329,7 +457,7 @@
             return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
                     '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
-                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</span>' +
+                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
                 '<div class="flex items-center gap-2">' +
                     '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
@@ -383,12 +511,24 @@
                 var youBadge = isMine ? ' <span class="text-[#556] normal-case tracking-normal">(you)</span>' : '';
                 var count = groups[device].length;
                 var countBadge = '<span class="ml-auto text-[10px] font-medium text-[#556] normal-case tracking-normal">' + count + ' file' + (count === 1 ? '' : 's') + '</span>';
+                var devicePath = serverCurrentPaths[device] || '';
+                var entries = getEntriesAtPath(groups[device], devicePath);
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
                 html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
+                html += breadcrumbHtml(devicePath, 'server', device);
                 html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
-                groups[device].forEach(function(f) {
-                    html += renderServerCard(f, localMap, device, isMine);
+                entries.folders.forEach(function(folderName) {
+                    var folderPath = devicePath + folderName + '/';
+                    var folderCount = folderFileCount(groups[device], folderPath);
+                    html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(device) + "', '" + escapeHtml(folderPath) + "')");
                 });
+                entries.files.forEach(function(f) {
+                    var displayName = f.rel_path.substring(devicePath.length);
+                    html += renderServerCard(f, localMap, device, isMine, displayName);
+                });
+                if (entries.folders.length === 0 && entries.files.length === 0) {
+                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
+                }
                 html += '</div>';
                 html += '</div>';
             });
@@ -396,42 +536,27 @@
         }
 
         function renderFileLists(clientFiles, serverFiles) {
+            // Cache raw data for re-rendering during navigation
+            cachedClientFiles = clientFiles;
+            cachedServerFiles = serverFiles;
+
             // Build maps keyed by rel_path
-            var localMap = {};
-            clientFiles.forEach(function(f) { localMap[f.rel_path] = f; });
-            var serverMap = {};
-            serverFiles.forEach(function(f) { serverMap[f.rel_path] = f; });
+            cachedLocalMap = {};
+            clientFiles.forEach(function(f) { cachedLocalMap[f.rel_path] = f; });
+            cachedServerMap = {};
+            serverFiles.forEach(function(f) { cachedServerMap[f.rel_path] = f; });
 
-            // Collect all unique rel_paths, sorted alphabetically (for local panel)
-            var allPaths = Object.keys(localMap).concat(
-                Object.keys(serverMap).filter(function(p) { return !localMap.hasOwnProperty(p); })
-            ).sort();
-
-            var localHtml = '';
-
-            allPaths.forEach(function(relPath) {
-                var status = computeStatus(localMap, serverMap, relPath);
-
-                if (localMap.hasOwnProperty(relPath)) {
-                    localHtml += renderLocalCard(localMap[relPath], status);
-                }
-            });
-
-            var localList = document.getElementById('local-file-list');
-            var serverList = document.getElementById('server-file-list');
-
-            localList.innerHTML = localHtml || emptyStateHtml('local');
-            serverList.innerHTML = renderServerGroups(serverFiles, localMap);
-
-            // Re-apply disabled state if an operation is in flight
-            if (operationInFlight) {
-                setButtonsDisabled(true);
-            }
+            rerenderLocal();
+            rerenderServer();
         }
 
         // ---- file list refresh ----
 
         async function refreshFileLists() {
+            // Reset navigation to root on refresh (after sync/push/pull/delete)
+            localCurrentPath = '';
+            serverCurrentPaths = {};
+            document.getElementById('local-breadcrumb').innerHTML = '';
             document.getElementById('local-file-list').innerHTML = loadingHtml();
             document.getElementById('server-file-list').innerHTML = loadingHtml();
             try {
