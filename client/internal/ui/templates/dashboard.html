@@ -198,10 +198,10 @@
         }
 
         // ---- Tailwind button class constants ----
-        var BTN_BASE = 'px-2.5 py-1 rounded text-[11px] font-medium cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
-        var BTN_PUSH = BTN_BASE + ' bg-[#0d2244] text-[#4d9eff] border-[#4d9eff44] hover:bg-[#1a3366] hover:border-[#4d9eff]';
-        var BTN_PULL = BTN_BASE + ' bg-[#2a0d44] text-[#c080ff] border-[#c080ff44] hover:bg-[#3a1a66] hover:border-[#c080ff]';
-        var BTN_DELETE = BTN_BASE + ' bg-[#2a0d0d] text-[#f24c4c] border-[#f24c4c33] hover:bg-[#3a1a1a] hover:border-[#f24c4c]';
+        var BTN_BASE = 'px-1.5 py-0.5 rounded text-[10px] font-normal cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
+        var BTN_PUSH = BTN_BASE + ' text-[#4d9eff] border-transparent hover:border-[#4d9eff44] hover:bg-[#0d224422]';
+        var BTN_PULL = BTN_BASE + ' text-[#c080ff] border-transparent hover:border-[#c080ff44] hover:bg-[#2a0d4422]';
+        var BTN_DELETE = BTN_BASE + ' text-[#f24c4c] border-transparent hover:border-[#f24c4c33] hover:bg-[#2a0d0d22]';
 
         // ---- helpers ----
 
@@ -395,12 +395,12 @@
         }
 
         function badgeHtml(status) {
-            var base = 'inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase';
+            var base = 'inline-flex items-center text-[9px] font-normal tracking-wide uppercase opacity-70';
             switch (status) {
-                case 'synced':     return '<span class="' + base + ' bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">synced</span>';
-                case 'conflict':   return '<span class="' + base + ' bg-[#3b2e0d] text-[#f0c040] border border-[#f0c04044]">conflict</span>';
-                case 'local-only': return '<span class="' + base + ' bg-[#0d1e3b] text-[#4d9eff] border border-[#4d9eff44]">local only</span>';
-                case 'server-only': return '<span class="' + base + ' bg-[#2e0d3b] text-[#c080ff] border border-[#c080ff44]">server only</span>';
+                case 'synced':     return '<span class="' + base + ' text-[#00d26a]">synced</span>';
+                case 'conflict':   return '<span class="' + base + ' text-[#f0c040]">conflict</span>';
+                case 'local-only': return '<span class="' + base + ' text-[#4d9eff]">local only</span>';
+                case 'server-only': return '<span class="' + base + ' text-[#c080ff]">server only</span>';
             }
             return '';
         }
@@ -419,16 +419,17 @@
             }
             actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
 
-            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
+            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
+                    '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
                     '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
-                '<div class="flex items-center gap-2">' +
-                    '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
+                '<div class="flex items-center gap-2 mt-auto">' +
+                    '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
                     badgeHtml(status) +
+                    '<span class="flex-1"></span>' +
+                    actions +
                 '</div>' +
-                '<div class="flex gap-1.5 mt-auto">' + actions + '</div>' +
                 '</div>';
         }
 
@@ -452,18 +453,19 @@
             if (isMine) {
                 actions += makeBtn('btn-delete', 'Remove', 'delete-server', f.rel_path);
             }
-            var localBadge = alreadyLocal ? '<span class="inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">local copy</span>' : '';
+            var localBadge = alreadyLocal ? '<span class="inline-flex items-center text-[9px] font-normal tracking-wide uppercase opacity-70 text-[#00d26a]">local copy</span>' : '';
 
-            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors">' +
+            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-lg shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
+                    '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
                     '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
-                '<div class="flex items-center gap-2">' +
-                    '<span class="text-[11px] text-[#666]">' + f.size_human + '</span>' +
+                '<div class="flex items-center gap-2 mt-auto">' +
+                    '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
                     localBadge +
+                    '<span class="flex-1"></span>' +
+                    actions +
                 '</div>' +
-                '<div class="flex gap-1.5 mt-auto">' + actions + '</div>' +
                 '</div>';
         }
 
