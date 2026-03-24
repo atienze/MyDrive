@@ -4,442 +4,149 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaultSync Dashboard</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: #1a1a2e;
-            color: #e0e0e0;
-            min-height: 100vh;
-        }
-
-        header {
-            background: #16213e;
-            border-bottom: 1px solid #2a2a4a;
-            padding: 16px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        header h1 {
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-
-        header .subtitle {
-            font-size: 12px;
-            color: #888;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .connection-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            color: #aaa;
-        }
-
-        .dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            vertical-align: middle;
-        }
-
-        .dot-green { background: #00d26a; box-shadow: 0 0 6px #00d26a88; }
-        .dot-red { background: #f24c4c; box-shadow: 0 0 6px #f24c4c88; }
-        .dot-amber { background: #f0c040; box-shadow: 0 0 6px #f0c04088; }
-
-        .sync-btn {
-            background: #0f62fe;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            padding: 8px 20px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .sync-btn:hover { background: #0043ce; }
-
-        .sync-btn:disabled {
-            background: #2a2a4a;
-            color: #666;
-            cursor: not-allowed;
-        }
-
-        main {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .status-cards {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .card {
-            background: #16213e;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            padding: 14px 16px;
-        }
-
-        .card-label {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-            margin-bottom: 6px;
-        }
-
-        .card-value {
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .card-detail {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
-        }
-
-        .error-banner {
-            background: #3a1c1c;
-            border: 1px solid #f24c4c44;
-            border-radius: 6px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: #f24c4c;
-            display: none;
-        }
-
-        /* Two-panel file browser */
-        .file-browser {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .panel {
-            background: #16213e;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .panel-header {
-            padding: 12px 16px;
-            border-bottom: 1px solid #2a2a4a;
-            background: #1a2444;
-        }
-
-        .panel-title {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #8899bb;
-            font-weight: 600;
-        }
-
-        .panel-subtitle {
-            font-size: 11px;
-            color: #556;
-            margin-top: 2px;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-        }
-
-        .file-list {
-            max-height: 480px;
-            overflow-y: auto;
-        }
-
-        .file-row {
-            padding: 10px 16px;
-            border-bottom: 1px solid #1e2a4a;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 13px;
-            transition: background 0.15s;
-        }
-
-        .file-row:last-child { border-bottom: none; }
-        .file-row:hover { background: #1e2a4a; }
-
-        .file-icon {
-            font-size: 14px;
-            flex-shrink: 0;
-            width: 18px;
-            text-align: center;
-        }
-
-        .file-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .file-path {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: #d0d8f0;
-        }
-
-        .file-meta {
-            font-size: 11px;
-            color: #666;
-            margin-top: 2px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 1px 7px;
-            border-radius: 10px;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-        }
-
-        .badge-synced { background: #0d3b2e; color: #00d26a; border: 1px solid #00d26a44; }
-        .badge-conflict { background: #3b2e0d; color: #f0c040; border: 1px solid #f0c04044; }
-        .badge-local { background: #0d1e3b; color: #4d9eff; border: 1px solid #4d9eff44; }
-        .badge-server { background: #2e0d3b; color: #c080ff; border: 1px solid #c080ff44; }
-
-        .device-heading {
-            padding: 8px 16px 4px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #8899bb;
-            font-weight: 700;
-            background: #1a2444;
-            border-bottom: 1px solid #2a2a4a;
-            position: sticky;
-            top: 0;
-            z-index: 1;
-        }
-        .device-group {
-            border-bottom: 2px solid #2a2a4a;
-        }
-
-        .file-actions {
-            display: flex;
-            gap: 6px;
-            flex-shrink: 0;
-        }
-
-        .btn {
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            border: 1px solid;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }
-
-        .btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .btn-push {
-            background: #0d2244;
-            color: #4d9eff;
-            border-color: #4d9eff44;
-        }
-        .btn-push:hover:not(:disabled) { background: #1a3366; border-color: #4d9eff; }
-
-        .btn-pull {
-            background: #2a0d44;
-            color: #c080ff;
-            border-color: #c080ff44;
-        }
-        .btn-pull:hover:not(:disabled) { background: #3a1a66; border-color: #c080ff; }
-
-        .btn-delete {
-            background: #2a0d0d;
-            color: #f24c4c;
-            border-color: #f24c4c33;
-        }
-        .btn-delete:hover:not(:disabled) { background: #3a1a1a; border-color: #f24c4c; }
-
-        .feedback-ok {
-            font-size: 11px;
-            color: #00d26a;
-            padding: 2px 0;
-        }
-
-        .feedback-err {
-            font-size: 11px;
-            color: #f24c4c;
-            padding: 2px 0;
-        }
-
-        .empty-state {
-            padding: 32px 24px;
-            text-align: center;
-            color: #556;
-            font-size: 13px;
-        }
-
-        .loading-state {
-            padding: 24px;
-            text-align: center;
-            color: #556;
-            font-size: 13px;
-            font-style: italic;
-        }
-
-        /* Activity log */
-        .activity-section h2 {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-            margin-bottom: 12px;
-        }
-
-        .activity-log {
-            background: #16213e;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .activity-entry {
-            padding: 8px 16px;
-            border-bottom: 1px solid #1e2a4a;
-            display: flex;
-            gap: 12px;
-            font-size: 12px;
-        }
-
-        .activity-entry:last-child { border-bottom: none; }
-
-        .activity-time {
-            color: #555;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 11px;
-            white-space: nowrap;
-            min-width: 80px;
-        }
-
-        .activity-msg {
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 11px;
-            color: #aaa;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body>
-    <header>
-        <div>
-            <h1>VaultSync</h1>
-            <div class="subtitle">File Browser</div>
-        </div>
-        <div class="header-right">
-            <div class="connection-status">
-                <span id="conn-dot" class="dot dot-red"></span>
-                <span id="conn-text">Disconnected</span>
-            </div>
-            <button id="sync-btn" class="sync-btn" onclick="forceSync()">Full Sync</button>
-        </div>
-    </header>
+<body class="font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',sans-serif] m-0 p-0">
+    <!-- Outermost container: full viewport, flex row on desktop, column on mobile -->
+    <div class="h-dvh flex flex-col lg:flex-row bg-[#1a1a2e] text-[#e0e0e0]">
 
-    <main>
-        <div id="error-banner" class="error-banner"></div>
+        <!-- Sidebar (hidden on mobile) -->
+        <aside class="w-56 bg-[#16213e] border-r border-[#2a2a4a] shrink-0 hidden lg:flex flex-col">
+            <!-- Brand -->
+            <div class="p-4 border-b border-[#2a2a4a] flex items-center gap-2">
+                <svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="text-base font-semibold tracking-wide">VaultSync</span>
+            </div>
+            <!-- Navigation -->
+            <div>
+                <div class="text-[10px] uppercase tracking-widest text-[#556] px-4 pt-4 pb-2">Navigation</div>
+                <nav class="flex flex-col gap-0.5 px-2">
+                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer bg-[#1a1a2e]">
+                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        All Files
+                    </div>
+                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
+                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                        Local Files
+                    </div>
+                    <div class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
+                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+                        Server Files
+                    </div>
+                </nav>
+            </div>
+            <!-- Spacer -->
+            <div class="flex-1"></div>
+            <!-- Bottom: device name -->
+            <div id="sidebar-device-name" class="text-xs text-[#556] p-4 border-t border-[#2a2a4a]">Loading...</div>
+        </aside>
 
-        <div class="status-cards">
-            <div class="card">
-                <div class="card-label">Connection</div>
-                <div class="card-value">
-                    <span id="status-conn-dot" class="dot dot-red"></span>
-                    <span id="status-conn-text">Disconnected</span>
+        <!-- Right column: header + content -->
+        <div class="flex-1 flex flex-col min-h-0">
+
+            <!-- Header bar -->
+            <header class="h-14 bg-[#16213e] border-b border-[#2a2a4a] flex items-center justify-between px-4 shrink-0">
+                <div class="text-lg font-semibold">All Files</div>
+                <div class="flex items-center gap-4">
+                    <!-- Sync stats -->
+                    <div class="text-xs text-[#888] hidden sm:flex items-center gap-1.5">
+                        <span id="header-file-count">0 files</span>
+                        <span class="text-[#556]">|</span>
+                        <span id="header-total-size">0 B</span>
+                    </div>
+                    <!-- Last sync -->
+                    <span id="header-last-sync" class="text-xs text-[#888] hidden sm:inline">Never synced</span>
+                    <!-- Connection indicator -->
+                    <div class="flex items-center gap-1.5 text-[13px] text-[#aaa]">
+                        <span id="conn-dot" class="inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]"></span>
+                        <span id="conn-text">Disconnected</span>
+                    </div>
+                    <!-- Sync button -->
+                    <button id="sync-btn" onclick="forceSync()" class="bg-[#0f62fe] hover:bg-[#0043ce] text-white text-sm font-medium px-4 py-1.5 rounded-md disabled:bg-[#2a2a4a] disabled:text-[#666] disabled:cursor-not-allowed cursor-pointer border-none">Full Sync</button>
                 </div>
-            </div>
-            <div class="card">
-                <div class="card-label">Sync Status</div>
-                <div class="card-value">
-                    <span id="sync-dot" class="dot dot-green"></span>
-                    <span id="sync-text">Idle</span>
+            </header>
+
+            <!-- Content area -->
+            <main class="flex-1 overflow-y-auto p-4 min-h-0">
+                <!-- Error banner -->
+                <div id="error-banner" class="bg-[#3a1c1c] border border-[#f24c4c44] rounded-md px-4 py-3 mb-4 text-[13px] text-[#f24c4c] hidden"></div>
+
+                <!-- Status cards -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
+                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Connection</div>
+                        <div class="text-base font-semibold flex items-center gap-1.5">
+                            <span id="status-conn-dot" class="inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]"></span>
+                            <span id="status-conn-text">Disconnected</span>
+                        </div>
+                    </div>
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
+                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Sync Status</div>
+                        <div class="text-base font-semibold flex items-center gap-1.5">
+                            <span id="sync-dot" class="inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]"></span>
+                            <span id="sync-text">Idle</span>
+                        </div>
+                    </div>
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
+                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Synced Files</div>
+                        <div class="text-base font-semibold" id="total-files">0</div>
+                        <div class="text-xs text-[#888] mt-1" id="total-size">0 B</div>
+                    </div>
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
+                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Last Sync</div>
+                        <div class="text-base font-semibold" id="last-sync-time">Never</div>
+                        <div class="text-xs text-[#888] mt-1" id="last-sync-detail"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="card">
-                <div class="card-label">Synced Files</div>
-                <div class="card-value" id="total-files">0</div>
-                <div class="card-detail" id="total-size">0 B</div>
-            </div>
-            <div class="card">
-                <div class="card-label">Last Sync</div>
-                <div class="card-value" id="last-sync-time">Never</div>
-                <div class="card-detail" id="last-sync-detail"></div>
-            </div>
+
+                <!-- File browser two-panel grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <!-- Left panel: local files -->
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
+                        <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
+                            <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Local</div>
+                            <div class="text-[11px] text-[#556] mt-0.5 font-mono" id="local-path">~/VaultDrive</div>
+                        </div>
+                        <div class="max-h-[480px] overflow-y-auto" id="local-file-list">
+                            <div class="py-6 px-4 text-center text-[#556] text-[13px] italic">Loading...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right panel: server files -->
+                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
+                        <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
+                            <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Server</div>
+                            <div class="text-[11px] text-[#556] mt-0.5 font-mono">Remote storage</div>
+                        </div>
+                        <div class="max-h-[480px] overflow-y-auto" id="server-file-list">
+                            <div class="py-6 px-4 text-center text-[#556] text-[13px] italic">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity log -->
+                <div>
+                    <h2 class="text-xs uppercase tracking-wider text-[#888] mb-3">Activity Log</h2>
+                    <div id="activity-log" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg max-h-[200px] overflow-y-auto">
+                        <div class="py-8 px-6 text-center text-[#556] text-[13px]">No activity yet</div>
+                    </div>
+                </div>
+            </main>
         </div>
-
-        <div class="file-browser">
-            <!-- Left panel: local files -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-title">Local</div>
-                    <div class="panel-subtitle" id="local-path">~/VaultDrive</div>
-                </div>
-                <div class="file-list" id="local-file-list">
-                    <div class="loading-state">Loading...</div>
-                </div>
-            </div>
-
-            <!-- Right panel: server files -->
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-title">Server</div>
-                    <div class="panel-subtitle">Remote storage</div>
-                </div>
-                <div class="file-list" id="server-file-list">
-                    <div class="loading-state">Loading...</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="activity-section">
-            <h2>Activity Log</h2>
-            <div id="activity-log" class="activity-log">
-                <div class="empty-state">No activity yet</div>
-            </div>
-        </div>
-    </main>
+    </div>
 
     <script>
         // ---- global state ----
         var operationInFlight = false;
         var currentDeviceName = '';
+
+        // ---- Tailwind button class constants ----
+        var BTN_BASE = 'px-2.5 py-1 rounded text-[11px] font-medium cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
+        var BTN_PUSH = BTN_BASE + ' bg-[#0d2244] text-[#4d9eff] border-[#4d9eff44] hover:bg-[#1a3366] hover:border-[#4d9eff]';
+        var BTN_PULL = BTN_BASE + ' bg-[#2a0d44] text-[#c080ff] border-[#c080ff44] hover:bg-[#3a1a66] hover:border-[#c080ff]';
+        var BTN_DELETE = BTN_BASE + ' bg-[#2a0d0d] text-[#f24c4c] border-[#f24c4c33] hover:bg-[#3a1a1a] hover:border-[#f24c4c]';
 
         // ---- helpers ----
 
@@ -496,7 +203,7 @@
         // ---- disable/enable all action buttons ----
 
         function setButtonsDisabled(disabled) {
-            var btns = document.querySelectorAll('.btn');
+            var btns = document.querySelectorAll('button[data-action]');
             btns.forEach(function(b) { b.disabled = disabled; });
         }
 
@@ -516,18 +223,20 @@
         }
 
         function badgeHtml(status) {
+            var base = 'inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase';
             switch (status) {
-                case 'synced':    return '<span class="badge badge-synced">synced</span>';
-                case 'conflict':  return '<span class="badge badge-conflict">conflict</span>';
-                case 'local-only': return '<span class="badge badge-local">local only</span>';
-                case 'server-only': return '<span class="badge badge-server">server only</span>';
+                case 'synced':     return '<span class="' + base + ' bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">synced</span>';
+                case 'conflict':   return '<span class="' + base + ' bg-[#3b2e0d] text-[#f0c040] border border-[#f0c04044]">conflict</span>';
+                case 'local-only': return '<span class="' + base + ' bg-[#0d1e3b] text-[#4d9eff] border border-[#4d9eff44]">local only</span>';
+                case 'server-only': return '<span class="' + base + ' bg-[#2e0d3b] text-[#c080ff] border border-[#c080ff44]">server only</span>';
             }
             return '';
         }
 
         function makeBtn(cls, label, action, relPath, deviceId) {
+            var btnClass = cls === 'btn-push' ? BTN_PUSH : cls === 'btn-pull' ? BTN_PULL : BTN_DELETE;
             var deviceAttr = deviceId ? ' data-device="' + escapeHtml(deviceId) + '"' : '';
-            return '<button class="btn ' + cls + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
+            return '<button class="' + btnClass + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
         }
 
         function renderLocalRow(f, status) {
@@ -537,13 +246,13 @@
             }
             actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
 
-            return '<div class="file-row">' +
-                '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
-                '<div class="file-info">' +
-                    '<div class="file-path" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
-                    '<div class="file-meta">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
+            return '<div class="px-4 py-2.5 border-b border-[#1e2a4a] last:border-b-0 flex items-center gap-2.5 text-[13px] transition-colors hover:bg-[#1e2a4a]">' +
+                '<span class="text-sm shrink-0 w-[18px] text-center">' + fileIcon(f.rel_path) + '</span>' +
+                '<div class="flex-1 min-w-0">' +
+                    '<div class="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis text-[#d0d8f0]" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
+                    '<div class="text-[11px] text-[#666] mt-0.5 flex items-center gap-2">' + f.size_human + ' \u00B7 ' + badgeHtml(status) + '</div>' +
                 '</div>' +
-                '<div class="file-actions">' + actions + '</div>' +
+                '<div class="flex gap-1.5 shrink-0">' + actions + '</div>' +
                 '</div>';
         }
 
@@ -566,21 +275,21 @@
             if (isMine) {
                 actions += makeBtn('btn-delete', 'Remove', 'delete-server', f.rel_path);
             }
-            var localBadge = alreadyLocal ? ' \u00B7 <span class="badge badge-synced">local copy</span>' : '';
+            var localBadge = alreadyLocal ? ' \u00B7 <span class="inline-flex items-center px-1.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-[#0d3b2e] text-[#00d26a] border border-[#00d26a44]">local copy</span>' : '';
 
-            return '<div class="file-row">' +
-                '<span class="file-icon">' + fileIcon(f.rel_path) + '</span>' +
-                '<div class="file-info">' +
-                    '<div class="file-path" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
-                    '<div class="file-meta">' + f.size_human + localBadge + '</div>' +
+            return '<div class="px-4 py-2.5 border-b border-[#1e2a4a] last:border-b-0 flex items-center gap-2.5 text-[13px] transition-colors hover:bg-[#1e2a4a]">' +
+                '<span class="text-sm shrink-0 w-[18px] text-center">' + fileIcon(f.rel_path) + '</span>' +
+                '<div class="flex-1 min-w-0">' +
+                    '<div class="font-mono text-xs whitespace-nowrap overflow-hidden text-ellipsis text-[#d0d8f0]" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(f.rel_path) + '</div>' +
+                    '<div class="text-[11px] text-[#666] mt-0.5 flex items-center gap-2">' + f.size_human + localBadge + '</div>' +
                 '</div>' +
-                '<div class="file-actions">' + actions + '</div>' +
+                '<div class="flex gap-1.5 shrink-0">' + actions + '</div>' +
                 '</div>';
         }
 
         function renderServerGroups(serverFiles, localMap) {
             if (!serverFiles || serverFiles.length === 0) {
-                return '<div class="empty-state">No server files</div>';
+                return '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No server files</div>';
             }
             var groups = groupByDevice(serverFiles);
             var deviceNames = Object.keys(groups).sort(function(a, b) {
@@ -591,8 +300,8 @@
             var html = '';
             deviceNames.forEach(function(device) {
                 var isMine = (device === currentDeviceName);
-                html += '<div class="device-group">';
-                html += '<div class="device-heading">' + escapeHtml(device) + '</div>';
+                html += '<div class="border-b-2 border-[#2a2a4a]">';
+                html += '<div class="px-4 py-2 pt-2 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1]">' + escapeHtml(device) + '</div>';
                 groups[device].forEach(function(f) {
                     html += renderServerFileRow(f, localMap, device, isMine);
                 });
@@ -626,7 +335,7 @@
             var localList = document.getElementById('local-file-list');
             var serverList = document.getElementById('server-file-list');
 
-            localList.innerHTML = localHtml || '<div class="empty-state">No local files</div>';
+            localList.innerHTML = localHtml || '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No local files</div>';
             serverList.innerHTML = renderServerGroups(serverFiles, localMap);
 
             // Re-apply disabled state if an operation is in flight
@@ -663,23 +372,31 @@
             // Header connection dot
             var connDot = document.getElementById('conn-dot');
             var connText = document.getElementById('conn-text');
-            connDot.className = 'dot ' + (data.connected ? 'dot-green' : 'dot-red');
+            if (data.connected) {
+                connDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
+            } else {
+                connDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]';
+            }
             connText.textContent = data.connected ? 'Connected' : 'Disconnected';
 
             // Status card: connection
             var scDot = document.getElementById('status-conn-dot');
             var scText = document.getElementById('status-conn-text');
-            scDot.className = 'dot ' + (data.connected ? 'dot-green' : 'dot-red');
+            if (data.connected) {
+                scDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
+            } else {
+                scDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]';
+            }
             scText.textContent = data.connected ? 'Connected' : 'Disconnected';
 
             // Status card: sync status
             var syncDot = document.getElementById('sync-dot');
             var syncText = document.getElementById('sync-text');
             if (data.syncing) {
-                syncDot.className = 'dot dot-amber';
+                syncDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f0c040] shadow-[0_0_6px_#f0c04088]';
                 syncText.textContent = 'Syncing...';
             } else {
-                syncDot.className = 'dot dot-green';
+                syncDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
                 syncText.textContent = 'Idle';
             }
 
@@ -705,9 +422,9 @@
             var banner = document.getElementById('error-banner');
             if (data.last_sync_error) {
                 banner.textContent = data.last_sync_error;
-                banner.style.display = 'block';
+                banner.classList.remove('hidden');
             } else {
-                banner.style.display = 'none';
+                banner.classList.add('hidden');
             }
 
             // Full sync button: disabled while syncing
@@ -716,14 +433,26 @@
             // Activity log
             var log = document.getElementById('activity-log');
             if (!data.activities || data.activities.length === 0) {
-                log.innerHTML = '<div class="empty-state">No activity yet</div>';
+                log.innerHTML = '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No activity yet</div>';
             } else {
                 log.innerHTML = data.activities.map(function(a) {
-                    return '<div class="activity-entry">' +
-                        '<span class="activity-time">' + formatTime(a.time) + '</span>' +
-                        '<span class="activity-msg">' + escapeHtml(a.message) + '</span>' +
+                    return '<div class="px-4 py-2 border-b border-[#1e2a4a] last:border-b-0 flex gap-3 text-xs">' +
+                        '<span class="text-[#555] font-mono text-[11px] whitespace-nowrap min-w-[80px]">' + formatTime(a.time) + '</span>' +
+                        '<span class="font-mono text-[11px] text-[#aaa]">' + escapeHtml(a.message) + '</span>' +
                         '</div>';
                 }).join('');
+            }
+
+            // Header chrome updates
+            document.getElementById('header-file-count').textContent = data.total_files + ' files';
+            document.getElementById('header-total-size').textContent = formatSize(data.total_size);
+            if (data.last_sync_time && data.last_sync_time !== '0001-01-01T00:00:00Z') {
+                document.getElementById('header-last-sync').textContent = 'Synced ' + timeAgo(data.last_sync_time);
+            } else {
+                document.getElementById('header-last-sync').textContent = 'Never synced';
+            }
+            if (data.device_name) {
+                document.getElementById('sidebar-device-name').textContent = data.device_name;
             }
         }
 
@@ -734,7 +463,7 @@
                 var data = await resp.json();
                 updateStatus(data);
             } catch (e) {
-                // UI server itself is down — handle gracefully
+                // UI server itself is down -- handle gracefully
             }
         }
 
@@ -742,14 +471,15 @@
 
         // Show inline feedback on the row containing the clicked button
         function showFeedback(btn, msg, isError) {
-            var row = btn.closest('.file-row');
+            var row = btn.closest('div.flex.items-center');
             if (!row) return;
-            var existing = row.querySelector('.feedback-ok, .feedback-err');
-            if (existing) existing.remove();
+            var existing = row.querySelector('.text-[\\#00d26a], .text-[\\#f24c4c]');
+            if (existing && (existing.classList.contains('text-[11px]')) && existing.tagName === 'SPAN') existing.remove();
             var span = document.createElement('span');
-            span.className = isError ? 'feedback-err' : 'feedback-ok';
+            span.className = isError ? 'text-[11px] text-[#f24c4c] py-0.5' : 'text-[11px] text-[#00d26a] py-0.5';
             span.textContent = msg;
-            var actions = row.querySelector('.file-actions');
+            span.dataset.feedback = 'true';
+            var actions = btn.parentElement;
             if (actions) actions.appendChild(span);
             // Auto-remove after 3s
             setTimeout(function() { if (span.parentNode) span.remove(); }, 3000);
@@ -885,7 +615,7 @@
         // ---- delegated click handler for file action buttons ----
 
         document.addEventListener('click', function(e) {
-            var btn = e.target.closest('.btn[data-action]');
+            var btn = e.target.closest('button[data-action]');
             if (!btn) return;
             var action = btn.dataset.action;
             var path = btn.dataset.path;
@@ -914,8 +644,6 @@
             }
         }
 
-        // ---- combined poll ----
-
         // ---- polling ----
         // Status polling: lightweight, local HTTP only (no TCP to server)
         // File list refresh: only on load and after operations (avoids TCP spam)
@@ -928,7 +656,7 @@
         // Initial load: fetch both status and file lists once
         fetchStatus();
         refreshFileLists();
-        // Only poll status on the timer — file lists refresh after operations
+        // Only poll status on the timer -- file lists refresh after operations
         setInterval(pollStatus, 5000);
     </script>
 </body>
