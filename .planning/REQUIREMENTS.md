@@ -16,11 +16,11 @@
 
 - [x] **DISP-01**: User sees files as cards in a responsive grid with file name, size, and type icon
 - [x] **DISP-02**: User sees sync status on each file card (synced, local-only, server-only)
-- [ ] **DISP-03**: User sees server files grouped by device name
+- [x] **DISP-03**: User sees server files grouped by device name
 - [ ] **DISP-04**: User sees action buttons (upload/download/delete) revealed on card hover
 - [ ] **DISP-05**: User can filter files by name using a search input in the header
-- [ ] **DISP-06**: User sees an empty state message when no files exist
-- [ ] **DISP-07**: User sees a loading indicator while files are being fetched
+- [x] **DISP-06**: User sees an empty state message when no files exist
+- [x] **DISP-07**: User sees a loading indicator while files are being fetched
 
 ### Operations
 
@@ -79,11 +79,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAYOUT-04 | Phase 3 | Pending |
 | DISP-01 | Phase 2 | Complete |
 | DISP-02 | Phase 2 | Complete |
-| DISP-03 | Phase 2 | Pending |
+| DISP-03 | Phase 2 | Complete |
 | DISP-04 | Phase 4 | Pending |
 | DISP-05 | Phase 4 | Pending |
-| DISP-06 | Phase 2 | Pending |
-| DISP-07 | Phase 2 | Pending |
+| DISP-06 | Phase 2 | Complete |
+| DISP-07 | Phase 2 | Complete |
 | OPS-01 | Phase 3 | Pending |
 | OPS-02 | Phase 3 | Pending |
 | OPS-03 | Phase 3 | Pending |

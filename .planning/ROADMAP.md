@@ -13,7 +13,7 @@ Four phases replacing the two-panel dashboard with a modern three-pane layout. P
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Layout + Header** - Three-pane skeleton and status chrome render correctly on desktop
-- [ ] **Phase 2: File Grid** - Card-based file display with metadata, status badges, and device grouping
+- [x] **Phase 2: File Grid** - Card-based file display with metadata, status badges, and device grouping (completed 2026-03-24)
 - [ ] **Phase 3: Operations + Tab Toggle** - All file operations wired to card buttons; client/server view switching works
 - [ ] **Phase 4: Mobile + Search** - Bottom nav, FAB upload, and search filter complete mobile and polish
 
@@ -90,6 +90,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Layout + Header | 2/2 | Complete | 2026-03-24 |
-| 2. File Grid | 1/2 | In Progress|  |
+| 2. File Grid | 2/2 | Complete   | 2026-03-24 |
 | 3. Operations + Tab Toggle | 0/2 | Not started | - |
 | 4. Mobile + Search | 0/2 | Not started | - |
