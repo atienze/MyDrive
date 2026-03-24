@@ -8,7 +8,7 @@
 ### Layout
 
 - [x] **LAYOUT-01**: User sees a three-pane desktop layout with persistent sidebar, contextual header, and central content grid
-- [x] **LAYOUT-02**: User sees a stacked mobile layout with bottom navigation bar replacing the sidebar
+- [ ] **LAYOUT-02**: User sees a stacked mobile layout with bottom navigation bar replacing the sidebar
 - [ ] **LAYOUT-03**: User can tap a floating action button on mobile to upload a file
 - [x] **LAYOUT-04**: User can switch between Local Files and Server Files via tab toggle
 
@@ -33,7 +33,7 @@
 
 - [x] **STAT-01**: User sees connection status (connected/disconnected) in the header
 - [x] **STAT-02**: User sees last sync timestamp in the header
-- [ ] **STAT-03**: User sees an error banner when operations fail
+- [x] **STAT-03**: User sees an error banner when operations fail
 - [ ] **STAT-04**: User sees sync stats summary (file count, total size)
 
 ## v2 Requirements
@@ -73,10 +73,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LAYOUT-01 | Phase 1 | Pending |
-| LAYOUT-02 | Phase 1 | Pending |
+| LAYOUT-01 | Phase 1 | Complete |
+| LAYOUT-02 | Phase 1 | Partial |
 | LAYOUT-03 | Phase 4 | Pending |
-| LAYOUT-04 | Phase 3 | Pending |
+| LAYOUT-04 | Phase 3 | Complete |
 | DISP-01 | Phase 2 | Complete |
 | DISP-02 | Phase 2 | Complete |
 | DISP-03 | Phase 2 | Complete |
@@ -88,10 +88,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OPS-02 | Phase 3 | Pending |
 | OPS-03 | Phase 3 | Pending |
 | OPS-04 | Phase 3 | Pending |
-| STAT-01 | Phase 1 | Pending |
-| STAT-02 | Phase 1 | Pending |
-| STAT-03 | Phase 3 | Pending |
-| STAT-04 | Phase 1 | Pending |
+| STAT-01 | Phase 1 | Complete |
+| STAT-02 | Phase 1 | Complete |
+| STAT-03 | Phase 3 | Complete |
+| STAT-04 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 19 total
@@ -100,4 +100,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-15*
-*Last updated: 2026-03-15 — traceability filled after roadmap creation*
+*Last updated: 2026-03-24 — Phase 2 complete, traceability updated*
