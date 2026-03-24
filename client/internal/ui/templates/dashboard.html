@@ -101,6 +101,13 @@
                     </div>
                 </div>
 
+                <!-- Tab toggle -->
+                <div id="tab-toggle" class="flex gap-1 mb-4 bg-[#16213e] border border-[#2a2a4a] rounded-lg p-1 w-fit">
+                    <button onclick="switchView('all')" data-tab="all" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-[#0f62fe] text-white font-medium">All Files</button>
+                    <button onclick="switchView('local')" data-tab="local" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]">Local</button>
+                    <button onclick="switchView('server')" data-tab="server" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]">Server</button>
+                </div>
+
                 <!-- File browser two-panel grid -->
                 <div id="file-panels" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                     <!-- Left panel: local files -->
@@ -195,6 +202,26 @@
                     }
                 }
             });
+
+            // Update tab toggle active state
+            var tabs = document.querySelectorAll('#tab-toggle button');
+            tabs.forEach(function(tab) {
+                if (tab.dataset.tab === view) {
+                    tab.className = 'px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-[#0f62fe] text-white font-medium';
+                } else {
+                    tab.className = 'px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]';
+                }
+            });
+        }
+
+        // ---- error banner helpers ----
+        function showErrorBanner(msg) {
+            var banner = document.getElementById('error-banner');
+            banner.textContent = msg;
+            banner.classList.remove('hidden');
+        }
+        function hideErrorBanner() {
+            document.getElementById('error-banner').classList.add('hidden');
         }
 
         // ---- Tailwind button class constants ----
@@ -561,6 +588,7 @@
             document.getElementById('local-breadcrumb').innerHTML = '';
             document.getElementById('local-file-list').innerHTML = loadingHtml();
             document.getElementById('server-file-list').innerHTML = loadingHtml();
+            hideErrorBanner();
             try {
                 var results = await Promise.all([
                     fetch('/api/files/client').then(function(r) { return r.json(); }),
@@ -574,7 +602,7 @@
                 });
                 renderFileLists(clientFiles, serverFiles);
             } catch (e) {
-                // Silently ignore network errors during polling
+                showErrorBanner('Failed to load file lists. Check server connection.');
             }
         }
 
@@ -673,11 +701,15 @@
         async function fetchStatus() {
             try {
                 var resp = await fetch('/api/status');
-                if (!resp.ok) return;
+                if (!resp.ok) {
+                    showErrorBanner('Unable to reach server. Check connection.');
+                    return;
+                }
                 var data = await resp.json();
+                hideErrorBanner();
                 updateStatus(data);
             } catch (e) {
-                // UI server itself is down -- handle gracefully
+                showErrorBanner('Unable to reach server. Check connection.');
             }
         }
 
@@ -855,6 +887,7 @@
                 }, 500);
             } catch (e) {
                 document.getElementById('sync-btn').disabled = false;
+                showErrorBanner('Sync failed. Check server connection.');
             }
         }
 

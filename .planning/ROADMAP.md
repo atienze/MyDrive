@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Card grid renderer with file type icons, size, and sync status badges
-- [ ] 02-02-PLAN.md — Device-grouped server view, loading state, and empty state
+- [x] 02-01-PLAN.md — Card grid renderer with file type icons, size, and sync status badges
+- [x] 02-02-PLAN.md — Device-grouped server view, loading state, and empty state
 
 ### Phase 3: Operations + Tab Toggle
 **Goal**: Users can upload, download, and delete files from card buttons; can switch between Local and Server views
@@ -61,11 +61,11 @@ Plans:
   4. User can delete a file (client or server) from its card after confirming the action
   5. User sees a per-file success or error message after each operation completes
   6. User sees a full-width error banner when a critical operation fails
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: Tab toggle state and view switching wired to file grid renderer
-- [ ] 03-02: Upload, download, delete operations wired to card action buttons with feedback
+- [ ] 03-01-PLAN.md — Tab toggle above file panels and error banner wiring for critical failures
+- [ ] 03-02-PLAN.md — Audit operation wiring completeness and human verification of all Phase 3 features
 
 ### Phase 4: Mobile + Search
 **Goal**: Users on mobile can navigate, upload via FAB, and filter files by name

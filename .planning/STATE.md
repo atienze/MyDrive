@@ -28,8 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 2 of 4 (File Grid)
 Plan: 2 of 2 in current phase
 Status: Executing (checkpoint:human-verify pending)
-Last activity: 2026-03-24 — Phase 2 Plan 02 complete, loading spinner + empty states + device group header polish
-
+Last activity: 2026-03-24 — Completed quick task 3: Minimize file card UI
 Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
@@ -75,6 +74,12 @@ None yet.
 - Phase 2 Plan 1 resolved: `/api/files/server` does NOT include `modified_at` — cards omit date field
 - Phase 1: Decide CDN vs. inline (~100KB) for Tailwind — homelab WAN may be unavailable; inline is safer
 - Phase 1: Verify `sync_dir` is present in `/api/status` payload before building breadcrumb in header
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 3 | Minimize file card UI — reduce badge, button, and size text prominence | 2026-03-24 | b2a06ef | [3-minimize-file-card-ui-reduce-badge-butto](./quick/3-minimize-file-card-ui-reduce-badge-butto/) |
 
 ## Session Continuity
 
