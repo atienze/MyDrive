@@ -110,7 +110,7 @@
                             <div class="text-[11px] text-[#556] mt-0.5 font-mono" id="local-path">~/VaultDrive</div>
                         </div>
                         <div id="local-file-list" class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                            <div class="col-span-full py-6 text-center text-[#556] text-[13px] italic">Loading...</div>
+                            <div class="col-span-full py-6 text-center text-[#556] text-[13px]">Loading...</div>
                         </div>
                     </div>
 
@@ -121,7 +121,7 @@
                             <div class="text-[11px] text-[#556] mt-0.5 font-mono">Remote storage</div>
                         </div>
                         <div id="server-file-list">
-                            <div class="py-6 px-4 text-center text-[#556] text-[13px] italic">Loading...</div>
+                            <div class="col-span-full py-6 text-center text-[#556] text-[13px]">Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -339,9 +339,37 @@
                 '</div>';
         }
 
+        function loadingHtml() {
+            return '<div class="col-span-full flex flex-col items-center justify-center py-12 gap-3">' +
+                '<svg class="animate-spin w-8 h-8 text-[#4d9eff]" viewBox="0 0 24 24" fill="none">' +
+                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>' +
+                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>' +
+                '</svg>' +
+                '<span class="text-[13px] text-[#556]">Loading files...</span>' +
+                '</div>';
+        }
+
+        function emptyStateHtml(type) {
+            var icon, title, subtitle;
+            if (type === 'local') {
+                icon = '<svg class="w-12 h-12 text-[#2a2a4a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+                title = 'No local files';
+                subtitle = 'Files in your sync directory will appear here';
+            } else {
+                icon = '<svg class="w-12 h-12 text-[#2a2a4a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
+                title = 'No server files';
+                subtitle = 'Push files from your local directory to see them here';
+            }
+            return '<div class="col-span-full flex flex-col items-center justify-center py-16 gap-3">' +
+                icon +
+                '<div class="text-sm font-medium text-[#888]">' + title + '</div>' +
+                '<div class="text-[11px] text-[#556]">' + subtitle + '</div>' +
+                '</div>';
+        }
+
         function renderServerGroups(serverFiles, localMap) {
             if (!serverFiles || serverFiles.length === 0) {
-                return '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No server files</div>';
+                return emptyStateHtml('server');
             }
             var groups = groupByDevice(serverFiles);
             var deviceNames = Object.keys(groups).sort(function(a, b) {
@@ -352,8 +380,11 @@
             var html = '';
             deviceNames.forEach(function(device) {
                 var isMine = (device === currentDeviceName);
+                var youBadge = isMine ? ' <span class="text-[#556] normal-case tracking-normal">(you)</span>' : '';
+                var count = groups[device].length;
+                var countBadge = '<span class="ml-auto text-[10px] font-medium text-[#556] normal-case tracking-normal">' + count + ' file' + (count === 1 ? '' : 's') + '</span>';
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
-                html += '<div class="px-4 py-2 pt-2 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1]">' + escapeHtml(device) + '</div>';
+                html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
                 html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
                 groups[device].forEach(function(f) {
                     html += renderServerCard(f, localMap, device, isMine);
@@ -389,7 +420,7 @@
             var localList = document.getElementById('local-file-list');
             var serverList = document.getElementById('server-file-list');
 
-            localList.innerHTML = localHtml || '<div class="col-span-full py-8 px-6 text-center text-[#556] text-[13px]">No local files</div>';
+            localList.innerHTML = localHtml || emptyStateHtml('local');
             serverList.innerHTML = renderServerGroups(serverFiles, localMap);
 
             // Re-apply disabled state if an operation is in flight
@@ -401,6 +432,8 @@
         // ---- file list refresh ----
 
         async function refreshFileLists() {
+            document.getElementById('local-file-list').innerHTML = loadingHtml();
+            document.getElementById('server-file-list').innerHTML = loadingHtml();
             try {
                 var results = await Promise.all([
                     fetch('/api/files/client').then(function(r) { return r.json(); }),
