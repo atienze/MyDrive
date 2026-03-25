@@ -10,8 +10,11 @@
     <!-- Outermost container: full viewport, flex row on desktop, column on mobile -->
     <div class="h-dvh flex flex-col lg:flex-row bg-[#1a1a2e] text-[#e0e0e0]">
 
-        <!-- Sidebar (hidden on mobile) -->
-        <aside class="w-56 bg-[#16213e] border-r border-[#2a2a4a] shrink-0 hidden lg:flex flex-col">
+        <!-- Sidebar backdrop (mobile only) -->
+        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
+
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-56 bg-[#16213e] border-r border-[#2a2a4a] shrink-0 hidden lg:flex flex-col fixed lg:static inset-y-0 left-0 z-50">
             <!-- Brand -->
             <div class="p-4 border-b border-[#2a2a4a] flex items-center gap-2">
                 <svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -48,7 +51,12 @@
 
             <!-- Header bar -->
             <header class="h-14 bg-[#16213e] border-b border-[#2a2a4a] flex items-center justify-between px-4 shrink-0">
-                <div id="header-title" class="text-lg font-semibold">All Files</div>
+                <div class="flex items-center gap-3">
+                    <button id="menu-btn" onclick="toggleSidebar()" class="lg:hidden bg-transparent border-none text-[#888] hover:text-[#ccc] cursor-pointer p-1">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <div id="header-title" class="text-lg font-semibold">All Files</div>
+                </div>
                 <div class="flex items-center gap-4">
                     <!-- Sync stats -->
                     <div class="text-xs text-[#888] hidden sm:flex items-center gap-1.5">
@@ -101,13 +109,6 @@
                     </div>
                 </div>
 
-                <!-- Tab toggle -->
-                <div id="tab-toggle" class="flex gap-1 mb-4 bg-[#16213e] border border-[#2a2a4a] rounded-lg p-1 w-fit">
-                    <button onclick="switchView('all')" data-tab="all" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-[#0f62fe] text-white font-medium">All Files</button>
-                    <button onclick="switchView('local')" data-tab="local" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]">Local</button>
-                    <button onclick="switchView('server')" data-tab="server" class="px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]">Server</button>
-                </div>
-
                 <!-- File browser two-panel grid -->
                 <div id="file-panels" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                     <!-- Left panel: local files -->
@@ -158,7 +159,22 @@
         var cachedLocalMap = {};
         var cachedServerMap = {};
 
-        // ---- Tailwind button class constants ----
+        // ---- sidebar toggle (mobile) ----
+        function toggleSidebar() {
+            var sidebar = document.getElementById('sidebar');
+            var backdrop = document.getElementById('sidebar-backdrop');
+            var isOpen = !sidebar.classList.contains('hidden') && sidebar.classList.contains('fixed');
+            if (window.innerWidth >= 1024) return; // lg breakpoint, sidebar always visible
+            if (isOpen) {
+                sidebar.classList.add('hidden');
+                backdrop.classList.add('hidden');
+            } else {
+                sidebar.classList.remove('hidden');
+                sidebar.classList.add('flex');
+                backdrop.classList.remove('hidden');
+            }
+        }
+
         // ---- view switching ----
         var currentView = 'all';
 
@@ -166,6 +182,12 @@
             currentView = view;
             var titles = { all: 'All Files', local: 'Local Files', server: 'Server Files' };
             document.getElementById('header-title').textContent = titles[view];
+
+            // Close sidebar on mobile after selection
+            if (window.innerWidth < 1024) {
+                document.getElementById('sidebar').classList.add('hidden');
+                document.getElementById('sidebar-backdrop').classList.add('hidden');
+            }
 
             var localPanel = document.getElementById('local-panel');
             var serverPanel = document.getElementById('server-panel');
@@ -203,15 +225,6 @@
                 }
             });
 
-            // Update tab toggle active state
-            var tabs = document.querySelectorAll('#tab-toggle button');
-            tabs.forEach(function(tab) {
-                if (tab.dataset.tab === view) {
-                    tab.className = 'px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-[#0f62fe] text-white font-medium';
-                } else {
-                    tab.className = 'px-4 py-1.5 text-sm rounded-md cursor-pointer border-none bg-transparent text-[#888] hover:text-[#ccc]';
-                }
-            });
         }
 
         // ---- error banner helpers ----
