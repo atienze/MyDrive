@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: planning
 stopped_at: "Completed 03-01-PLAN.md"
-last_updated: "2026-03-24T23:35:00.000Z"
-last_activity: 2026-03-24 — Phase 3 Plan 1 complete (tab toggle + error banner)
+last_updated: "2026-03-25T06:29:59Z"
+last_activity: 2026-03-25 — Quick task 4 complete (wire device_name into /api/status)
 progress:
   total_phases: 4
   completed_phases: 2
@@ -82,9 +82,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 3 | Minimize file card UI — reduce badge, button, and size text prominence | 2026-03-24 | b2a06ef | [3-minimize-file-card-ui-reduce-badge-butto](./quick/3-minimize-file-card-ui-reduce-badge-butto/) |
+| 4 | Wire device_name into /api/status so isMine works for Remove + (you) badge | 2026-03-25 | 17c8f00 | [4-fix-push-pull-button-logic-or-complete-p](./quick/4-fix-push-pull-button-logic-or-complete-p/) |
 
 ## Session Continuity
 
-Last session: 2026-03-24T23:30:00.000Z
-Stopped at: Phase 2 complete, ready for Phase 3
+Last session: 2026-03-25T06:29:59Z
+Stopped at: Quick task 4 complete
 Resume file: None
