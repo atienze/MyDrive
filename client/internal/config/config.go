@@ -50,7 +50,8 @@ func Load() (*Config, error) {
 				"then create %s with the printed token:\n\n"+
 				"  server_addr = \"<server-ip>:9000\"\n"+
 				"  token       = \"<64-char-token>\"\n"+
-				"  sync_dir    = \"<path-to-sync>\"",
+				"  sync_dir    = \"<path-to-sync>\"\n"+
+				"  device_name = \"<device-name>\"",
 			path, path,
 		)
 	}

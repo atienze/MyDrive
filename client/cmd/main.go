@@ -103,6 +103,7 @@ func runDaemon() {
 
 	// Shared state between the sync loop and the web UI.
 	appStatus := status.New()
+	appStatus.SetDeviceName(cfg.DeviceName)
 	forceSyncCh := make(chan struct{}, 1)
 	var syncMu stdsync.Mutex
 
