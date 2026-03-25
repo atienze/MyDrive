@@ -56,6 +56,12 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
+	// Run schema migrations for pre-existing databases that may have been created
+	// with an older schema (e.g. UNIQUE(rel_path) alone instead of UNIQUE(rel_path, device_id)).
+	if err := db.migrateSchema(); err != nil {
+		return nil, fmt.Errorf("failed to migrate schema: %w", err)
+	}
+
 	log.Println("Database initialized successfully")
 	return db, nil
 }
@@ -94,6 +100,43 @@ func (db *DB) createTables() error {
 	// For queries that return rows, we'd use Query() or QueryRow() instead.
 	_, err := db.conn.Exec(schema)
 	return err
+}
+
+// migrateSchema checks for and applies schema changes needed for pre-existing databases.
+// Fresh databases created by createTables() already have the correct schema, so this
+// is a no-op for them. For older databases that only had UNIQUE(rel_path) instead of
+// UNIQUE(rel_path, device_id), this creates the correct composite unique index so that
+// UpsertFile's ON CONFLICT(rel_path, device_id) clause resolves without errors.
+func (db *DB) migrateSchema() error {
+	// Check whether the composite unique index on (rel_path, device_id) already exists.
+	var indexName string
+	err := db.conn.QueryRow(`
+		SELECT name FROM sqlite_master
+		WHERE type='index' AND tbl_name='files'
+		AND sql LIKE '%rel_path%' AND sql LIKE '%device_id%'
+	`).Scan(&indexName)
+
+	if err == nil {
+		// Index already exists — schema is up to date.
+		log.Println("Database schema up to date")
+		return nil
+	}
+
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("check schema migration: %w", err)
+	}
+
+	// Index does not exist — run migration.
+	log.Println("Database migration: adding composite unique index on files(rel_path, device_id)")
+	_, err = db.conn.Exec(`
+		DROP INDEX IF EXISTS sqlite_autoindex_files_1;
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_files_path_device ON files(rel_path, device_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("apply schema migration: %w", err)
+	}
+	log.Println("Database migration: added composite unique index on files(rel_path, device_id)")
+	return nil
 }
 
 // ----------------------------------------
