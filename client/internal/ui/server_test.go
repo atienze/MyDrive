@@ -624,3 +624,260 @@ func contains(s, sub string) bool {
 			return false
 		}())
 }
+
+// ─── Phase 3 gap tests: handleDownload, handleDeleteServer, handleUpload happy path ─
+
+// TestHandleDownload_PathValidation verifies that invalid paths are rejected
+// with 400 before any TCP attempt is made.
+func TestHandleDownload_PathValidation(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+
+	invalidPaths := []struct {
+		name string
+		path string
+	}{
+		{"empty path", ""},
+		{"absolute path", "/absolute"},
+		{"traversal path", "../../escape"},
+	}
+
+	for _, tc := range invalidPaths {
+		t.Run(tc.name, func(t *testing.T) {
+			url := "/api/files/download"
+			if tc.path != "" {
+				url += "?path=" + tc.path
+			}
+			req := httptest.NewRequest(http.MethodPost, url, nil)
+			w := httptest.NewRecorder()
+
+			u.handleDownload(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400 for path %q; body: %s",
+					w.Code, tc.path, w.Body.String())
+			}
+
+			var resp opResponse
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.Ok {
+				t.Errorf("expected ok=false for invalid path %q", tc.path)
+			}
+		})
+	}
+}
+
+// TestHandleDownload_HappyPath verifies that POST /api/files/download with a
+// valid path passes all validation and reaches the DownloadSingleFile call.
+// Since the test server's ServerAddr points to 127.0.0.1:9999 (unreachable),
+// DownloadSingleFile returns ErrServerUnreachable, which the handler maps to 502.
+// A 502 (not 400) proves the handler passed all validation successfully.
+func TestHandleDownload_HappyPath(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+	// testServer already sets ServerAddr = "127.0.0.1:9999" (unreachable).
+
+	req := httptest.NewRequest(http.MethodPost, "/api/files/download?path=docs/readme.txt", nil)
+	w := httptest.NewRecorder()
+
+	u.handleDownload(w, req)
+
+	// Must NOT be 400 — validation passed.
+	if w.Code == http.StatusBadRequest {
+		t.Fatalf("got 400 (validation error); expected handler to reach DownloadSingleFile. body: %s", w.Body.String())
+	}
+
+	// Expect 502 because the server at 127.0.0.1:9999 is unreachable.
+	if w.Code != http.StatusBadGateway {
+		t.Logf("note: expected 502 (server unreachable), got %d. body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false when server is unreachable")
+	}
+}
+
+// TestHandleDeleteServer_PathValidation verifies that invalid paths are rejected
+// with 400 before any TCP attempt is made.
+func TestHandleDeleteServer_PathValidation(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+
+	invalidPaths := []struct {
+		name string
+		path string
+	}{
+		{"empty path", ""},
+		{"absolute path", "/absolute"},
+		{"traversal path", "../../escape"},
+	}
+
+	for _, tc := range invalidPaths {
+		t.Run(tc.name, func(t *testing.T) {
+			url := "/api/files/server"
+			if tc.path != "" {
+				url += "?path=" + tc.path
+			}
+			req := httptest.NewRequest(http.MethodDelete, url, nil)
+			w := httptest.NewRecorder()
+
+			u.handleDeleteServer(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("status = %d, want 400 for path %q; body: %s",
+					w.Code, tc.path, w.Body.String())
+			}
+
+			var resp opResponse
+			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if resp.Ok {
+				t.Errorf("expected ok=false for invalid path %q", tc.path)
+			}
+		})
+	}
+}
+
+// TestHandleDeleteServer_HappyPath verifies that DELETE /api/files/server with a
+// valid path passes all validation and reaches the DeleteServerFile call.
+// Since the test server's ServerAddr points to 127.0.0.1:9999 (unreachable),
+// DeleteServerFile returns ErrServerUnreachable, which the handler maps to 502.
+// A 502 (not 400) proves the handler passed all validation successfully.
+func TestHandleDeleteServer_HappyPath(t *testing.T) {
+	u, _ := testServer(t, t.TempDir())
+	// testServer already sets ServerAddr = "127.0.0.1:9999" (unreachable).
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/files/server?path=docs/readme.txt", nil)
+	w := httptest.NewRecorder()
+
+	u.handleDeleteServer(w, req)
+
+	// Must NOT be 400 — validation passed.
+	if w.Code == http.StatusBadRequest {
+		t.Fatalf("got 400 (validation error); expected handler to reach DeleteServerFile. body: %s", w.Body.String())
+	}
+
+	// Expect 502 because the server at 127.0.0.1:9999 is unreachable.
+	if w.Code != http.StatusBadGateway {
+		t.Logf("note: expected 502 (server unreachable), got %d. body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false when server is unreachable")
+	}
+}
+
+// TestHandleUpload_HappyPath verifies that POST /api/files/upload with a valid
+// path to an existing file passes all validation and reaches the UploadSingleFile
+// call. Since the test server's ServerAddr points to 127.0.0.1:9999 (unreachable),
+// UploadSingleFile returns ErrServerUnreachable, which the handler maps to 502.
+// A 502 (not 400) proves the handler passed all validation and attempted TCP.
+func TestHandleUpload_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "notes.txt", "some content")
+
+	u, _ := testServer(t, dir)
+	// testServer already sets ServerAddr = "127.0.0.1:9999" (unreachable).
+
+	req := httptest.NewRequest(http.MethodPost, "/api/files/upload?path=notes.txt", nil)
+	w := httptest.NewRecorder()
+
+	u.handleUpload(w, req)
+
+	// Must NOT be 400 — validation passed.
+	if w.Code == http.StatusBadRequest {
+		t.Fatalf("got 400 (validation error); expected handler to reach UploadSingleFile. body: %s", w.Body.String())
+	}
+
+	// Expect 502 because the server at 127.0.0.1:9999 is unreachable.
+	if w.Code != http.StatusBadGateway {
+		t.Logf("note: expected 502 (server unreachable), got %d. body: %s", w.Code, w.Body.String())
+	}
+
+	var resp opResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Ok {
+		t.Error("expected ok=false when server is unreachable")
+	}
+}
+
+// ─── Phase 3-01/02 gap tests: dashboard HTML content verification ─────────────
+
+// readDashboardHTML reads the embedded dashboard HTML via the templateFS embed.FS
+// exported from server.go (same package). This function centralizes the read so
+// all HTML-content tests share a single source.
+func readDashboardHTML(t *testing.T) string {
+	t.Helper()
+	data, err := templateFS.ReadFile("templates/dashboard.html")
+	if err != nil {
+		t.Fatalf("failed to read embedded dashboard.html: %v", err)
+	}
+	return string(data)
+}
+
+// TestDashboardHTML_ErrorBanner verifies that the embedded dashboard HTML contains
+// the error banner element and all three critical-path wiring calls required by
+// STAT-03: showErrorBanner in refreshFileLists, fetchStatus, and forceSync.
+func TestDashboardHTML_ErrorBanner(t *testing.T) {
+	html := readDashboardHTML(t)
+
+	requiredStrings := []struct {
+		name  string
+		token string
+	}{
+		{"error-banner element", `id="error-banner"`},
+		{"showErrorBanner function definition", `function showErrorBanner(`},
+		{"hideErrorBanner function definition", `function hideErrorBanner(`},
+		{"error banner wired to refreshFileLists", `showErrorBanner('Failed to load file lists`},
+		{"error banner wired to fetchStatus", `showErrorBanner('Unable to reach server`},
+		{"error banner wired to forceSync", `showErrorBanner('Sync failed`},
+	}
+
+	for _, tc := range requiredStrings {
+		t.Run(tc.name, func(t *testing.T) {
+			if !contains(html, tc.token) {
+				t.Errorf("dashboard.html missing required string: %q", tc.token)
+			}
+		})
+	}
+}
+
+// TestDashboardHTML_PerFileFeedback verifies that the embedded dashboard HTML
+// contains showFeedback(btn, calls inside each of the five operation functions
+// required by OPS-04: doUpload, doDownload, doDevicePull, doDeleteServer, doDeleteClient.
+func TestDashboardHTML_PerFileFeedback(t *testing.T) {
+	html := readDashboardHTML(t)
+
+	requiredStrings := []struct {
+		name  string
+		token string
+	}{
+		{"showFeedback function definition", `function showFeedback(btn,`},
+		{"doUpload function exists", `async function doUpload(`},
+		{"doDownload function exists", `async function doDownload(`},
+		{"doDeleteServer function exists", `async function doDeleteServer(`},
+		{"doDeleteClient function exists", `async function doDeleteClient(`},
+		{"showFeedback called in doUpload (Pushed success)", `showFeedback(btn, 'Pushed'`},
+		{"showFeedback called in doDownload (Pulled success)", `showFeedback(btn, 'Pulled'`},
+		{"showFeedback called on delete success (Deleted)", `showFeedback(btn, 'Deleted'`},
+		{"showFeedback called on network error", `showFeedback(btn, 'Network error'`},
+	}
+
+	for _, tc := range requiredStrings {
+		t.Run(tc.name, func(t *testing.T) {
+			if !contains(html, tc.token) {
+				t.Errorf("dashboard.html missing required string: %q", tc.token)
+			}
+		})
+	}
+}
