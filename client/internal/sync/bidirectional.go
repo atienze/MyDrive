@@ -64,10 +64,11 @@ func (s *Syncer) uploadPhase() (int, error) {
 	}
 	for relPath := range s.state.Files {
 		if !currentFiles[relPath] {
-			fmt.Printf("Local deletion detected: %s\n", relPath)
-			if err := s.sendDeleteFile(relPath); err != nil {
-				log.Printf("Warning: failed to send delete for %s: %v", relPath, err)
-			}
+			fmt.Printf("Local deletion detected (removed from tracking): %s\n", relPath)
+			// Only remove from local state — do NOT send CmdDeleteFile to server.
+			// The server is the persistent store; local deletions should not
+			// cascade to the server. Users can explicitly delete from server
+			// via the Web UI's "Remove from server" action.
 			s.state.RemoveFile(relPath)
 		}
 	}
