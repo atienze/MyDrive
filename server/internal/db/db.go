@@ -103,35 +103,67 @@ func (db *DB) createTables() error {
 }
 
 // migrateSchema checks for and applies schema changes needed for pre-existing databases.
-// Fresh databases created by createTables() already have the correct schema, so this
-// is a no-op for them. For older databases that only had UNIQUE(rel_path) instead of
-// UNIQUE(rel_path, device_id), this creates the correct composite unique index so that
+// Fresh databases created by createTables() already have the correct schema (UNIQUE(rel_path,
+// device_id) defined inline in CREATE TABLE), so this is a no-op for them. For older databases
+// that only had UNIQUE(rel_path) alone, this creates the correct composite unique index so that
 // UpsertFile's ON CONFLICT(rel_path, device_id) clause resolves without errors.
+//
+// Detection strategy: use pragma_index_info to check whether any unique index on the files
+// table actually covers both rel_path and device_id columns. This correctly identifies both
+// named user indexes AND system autoindexes generated from inline UNIQUE constraints.
 func (db *DB) migrateSchema() error {
-	// Check whether the composite unique index on (rel_path, device_id) already exists.
-	var indexName string
-	err := db.conn.QueryRow(`
-		SELECT name FROM sqlite_master
-		WHERE type='index' AND tbl_name='files'
-		AND sql LIKE '%rel_path%' AND sql LIKE '%device_id%'
-	`).Scan(&indexName)
-
-	if err == nil {
-		// Index already exists — schema is up to date.
-		log.Println("Database schema up to date")
-		return nil
-	}
-
-	if err != sql.ErrNoRows {
-		return fmt.Errorf("check schema migration: %w", err)
-	}
-
-	// Index does not exist — run migration.
-	log.Println("Database migration: adding composite unique index on files(rel_path, device_id)")
-	_, err = db.conn.Exec(`
-		DROP INDEX IF EXISTS sqlite_autoindex_files_1;
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_files_path_device ON files(rel_path, device_id);
+	// Find all unique indexes on the files table.
+	rows, err := db.conn.Query(`
+		SELECT il.name FROM pragma_index_list('files') il WHERE il."unique" = 1
 	`)
+	if err != nil {
+		return fmt.Errorf("check schema migration (index list): %w", err)
+	}
+	defer rows.Close()
+
+	var indexNames []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return fmt.Errorf("scan index name: %w", err)
+		}
+		indexNames = append(indexNames, name)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate index list: %w", err)
+	}
+	rows.Close() // close before next query
+
+	// For each unique index, check if it covers both rel_path and device_id.
+	for _, idxName := range indexNames {
+		colRows, err := db.conn.Query(`SELECT name FROM pragma_index_info(?)`, idxName)
+		if err != nil {
+			return fmt.Errorf("check index info for %s: %w", idxName, err)
+		}
+
+		cols := make(map[string]bool)
+		for colRows.Next() {
+			var col string
+			if err := colRows.Scan(&col); err != nil {
+				colRows.Close()
+				return fmt.Errorf("scan index column: %w", err)
+			}
+			cols[col] = true
+		}
+		colRows.Close()
+
+		if cols["rel_path"] && cols["device_id"] {
+			// Composite unique index covering both columns already exists.
+			log.Println("Database schema up to date")
+			return nil
+		}
+	}
+
+	// No composite unique index found — run migration.
+	log.Println("Database migration: adding composite unique index on files(rel_path, device_id)")
+	_, err = db.conn.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_files_path_device ON files(rel_path, device_id)`,
+	)
 	if err != nil {
 		return fmt.Errorf("apply schema migration: %w", err)
 	}
