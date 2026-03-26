@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 3 of 4 (Operations + Tab Toggle)
 Plan: 1 of 2 in current phase
 Status: In progress
-Last activity: 2026-03-25 — Completed quick task 4: Fix push/pull button logic
+Last activity: 2026-03-25 — Completed quick task 6: Fix SQL ON CONFLICT error and local deletion cascade
 Progress: [██████░░░░] 62%
 
 ## Performance Metrics
@@ -83,6 +83,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 3 | Minimize file card UI — reduce badge, button, and size text prominence | 2026-03-24 | b2a06ef | [3-minimize-file-card-ui-reduce-badge-butto](./quick/3-minimize-file-card-ui-reduce-badge-butto/) |
 | 4 | Wire device_name into /api/status so isMine works for Remove + (you) badge | 2026-03-25 | 17c8f00 | [4-fix-push-pull-button-logic-or-complete-p](./quick/4-fix-push-pull-button-logic-or-complete-p/) |
+| 6 | Fix SQL ON CONFLICT error on push and prevent local deletions from cascading to server | 2026-03-25 | a2322fd | [6-fix-sql-on-conflict-error-on-push-and-pr](./quick/6-fix-sql-on-conflict-error-on-push-and-pr/) |
 
 ## Session Continuity
 

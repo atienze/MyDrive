@@ -76,11 +76,11 @@ Plans:
   2. User on mobile can tap a floating action button to open the file picker and upload a file
   3. User sees upload/download/delete action buttons revealed on card hover (desktop) or always visible (mobile)
   4. User can type in the header search input and see the file list filtered to matching names in real time
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: Bottom nav, FAB upload, and mobile-safe touch targets
-- [ ] 04-02: Hover-reveal card actions and client-side search filter
+- [ ] 04-01-PLAN.md — Bottom nav, FAB upload, hover-reveal card actions, and mobile touch targets
+- [ ] 04-02-PLAN.md — Client-side search filter and full Phase 4 human verification
 
 ## Progress
 
