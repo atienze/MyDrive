@@ -267,7 +267,7 @@
         }
 
         // ---- Tailwind button class constants ----
-        var BTN_BASE = 'px-1.5 py-0.5 rounded text-[10px] font-normal cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
+        var BTN_BASE = 'px-1.5 py-0.5 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2 rounded text-[10px] font-normal cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
         var BTN_PUSH = BTN_BASE + ' text-[#4d9eff] border-transparent hover:border-[#4d9eff44] hover:bg-[#0d224422]';
         var BTN_PULL = BTN_BASE + ' text-[#c080ff] border-transparent hover:border-[#c080ff44] hover:bg-[#2a0d4422]';
         var BTN_DELETE = BTN_BASE + ' text-[#f24c4c] border-transparent hover:border-[#f24c4c33] hover:bg-[#2a0d0d22]';
@@ -488,12 +488,12 @@
             }
             actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
 
-            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
+            return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
                     '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
                     '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
-                '<div class="flex items-center gap-2 mt-auto">' +
+                '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
                     '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
                     badgeHtml(status) +
                     '<span class="flex-1"></span>' +
@@ -524,12 +524,12 @@
             }
             var localBadge = alreadyLocal ? '<span class="inline-flex items-center text-[9px] font-normal tracking-wide uppercase opacity-70 text-[#00d26a]">local copy</span>' : '';
 
-            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
+            return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
                     '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
                     '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
-                '<div class="flex items-center gap-2 mt-auto">' +
+                '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
                     '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
                     localBadge +
                     '<span class="flex-1"></span>' +
