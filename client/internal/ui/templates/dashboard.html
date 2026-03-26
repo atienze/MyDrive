@@ -152,7 +152,7 @@
     </div>
 
     <!-- FAB: floating action button for quick upload on mobile -->
-    <button id="fab-btn" onclick="document.getElementById('fab-file-input').click()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Push a local file to server">+</button>
+    <button id="fab-btn" onclick="document.getElementById('fab-file-input').click()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Import and push a file to server">+</button>
     <input id="fab-file-input" type="file" class="hidden" onchange="handleFabFileSelect(this)">
 
     <!-- Bottom navigation bar: mobile only -->
@@ -854,25 +854,38 @@
             }
         }
 
-        function handleFabFileSelect(input) {
+        async function handleFabFileSelect(input) {
             var file = input.files[0];
             if (!file) return;
-            var name = file.name;
-            var match = cachedClientFiles.find(function(f) {
-                return f.rel_path.split('/').pop() === name;
-            });
             input.value = '';
             var fabBtn = document.getElementById('fab-btn');
-            if (!match) {
-                showFeedback(fabBtn, 'Not in sync dir', true);
-                return;
+            if (operationInFlight) return;
+            operationInFlight = true;
+            var origText = fabBtn.textContent;
+            fabBtn.textContent = '...';
+            setButtonsDisabled(true);
+            try {
+                var fd = new FormData();
+                fd.append('file', file);
+                var subdir = localCurrentPath;
+                var url = '/api/files/import';
+                if (subdir) url += '?subdir=' + encodeURIComponent(subdir);
+                var resp = await fetch(url, { method: 'POST', body: fd });
+                var data = await resp.json();
+                if (data.ok) {
+                    showFeedback(fabBtn, 'Imported', false);
+                    await refreshFileLists();
+                    await fetchStatus();
+                } else {
+                    showFeedback(fabBtn, data.message || 'Import failed', true);
+                }
+            } catch (e) {
+                showFeedback(fabBtn, 'Network error', true);
+            } finally {
+                operationInFlight = false;
+                fabBtn.textContent = origText;
+                setButtonsDisabled(false);
             }
-            var status = computeStatus(cachedLocalMap, cachedServerMap, match.rel_path);
-            if (status === 'synced') {
-                showFeedback(fabBtn, 'Already synced', false);
-                return;
-            }
-            doUpload(match.rel_path, fabBtn);
         }
 
         async function doDownload(relPath, btn) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -125,6 +126,7 @@ func (u *UIServer) Start(addr string) error {
 	mux.HandleFunc("GET /api/files/client", u.handleClientFileList)
 	mux.HandleFunc("GET /api/files/server", u.handleServerFileList)
 	mux.HandleFunc("POST /api/files/upload", u.handleUpload)
+	mux.HandleFunc("POST /api/files/import", u.handleImport)
 	mux.HandleFunc("POST /api/files/download", u.handleDownload)
 	mux.HandleFunc("POST /api/files/pull", u.handlePull)
 	mux.HandleFunc("DELETE /api/files/server", u.handleDeleteServer)
@@ -246,6 +248,73 @@ func (u *UIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	u.status.AddActivity(fmt.Sprintf("Uploaded %s", relPath))
 	writeJSON(w, http.StatusOK, opResponse{Ok: true, Message: "uploaded"})
+}
+
+// handleImport copies an uploaded file into sync_dir then pushes it to the server.
+// POST /api/files/import?subdir=<optional rel subdir> — acquires syncMu.
+func (u *UIServer) handleImport(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("parse form: %v", err))
+		return
+	}
+
+	uploadedFile, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("get file: %v", err))
+		return
+	}
+	defer uploadedFile.Close()
+
+	subdir := r.URL.Query().Get("subdir")
+	if subdir != "" {
+		if err := validateRelPath(subdir); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid subdir: %v", err))
+			return
+		}
+	}
+
+	filename := filepath.Base(header.Filename)
+	destPath := filepath.Join(u.cfg.SyncDir, subdir, filename)
+
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("create dirs: %v", err))
+		return
+	}
+
+	out, err := os.Create(destPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("create file: %v", err))
+		return
+	}
+	if _, err := io.Copy(out, uploadedFile); err != nil {
+		out.Close()
+		os.Remove(destPath)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("write file: %v", err))
+		return
+	}
+	out.Close()
+
+	relPath, err := filepath.Rel(u.cfg.SyncDir, destPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("compute rel path: %v", err))
+		return
+	}
+
+	u.syncMu.Lock()
+	uploadErr := syncclient.UploadSingleFile(u.cfg, u.st, u.statePath, relPath)
+	u.syncMu.Unlock()
+
+	if uploadErr != nil {
+		u.status.AddActivity(fmt.Sprintf("Import upload failed: %s: %v", relPath, uploadErr))
+		writeError(w, httpStatusFromErr(uploadErr), fmt.Sprintf("upload failed: %v", uploadErr))
+		return
+	}
+
+	u.status.AddActivity(fmt.Sprintf("Imported %s", relPath))
+	writeJSON(w, http.StatusOK, struct {
+		Ok      bool   `json:"ok"`
+		RelPath string `json:"rel_path"`
+	}{Ok: true, RelPath: relPath})
 }
 
 // handlePull downloads a file from a specific device's namespace on the server.
