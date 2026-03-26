@@ -9,15 +9,15 @@
 
 - [x] **LAYOUT-01**: User sees a three-pane desktop layout with persistent sidebar, contextual header, and central content grid
 - [ ] **LAYOUT-02**: User sees a stacked mobile layout with bottom navigation bar replacing the sidebar
-- [ ] **LAYOUT-03**: User can tap a floating action button on mobile to upload a file
-- [x] **LAYOUT-04**: User can switch between Local Files and Server Files via tab toggle
+- [x] **LAYOUT-03**: User can tap a floating action button on mobile to upload a file
+- [x] **LAYOUT-04**: User can switch between Local Files and Server Files via sidebar navigation (accessible on small screens via hamburger menu)
 
 ### File Display
 
 - [x] **DISP-01**: User sees files as cards in a responsive grid with file name, size, and type icon
 - [x] **DISP-02**: User sees sync status on each file card (synced, local-only, server-only)
 - [x] **DISP-03**: User sees server files grouped by device name
-- [ ] **DISP-04**: User sees action buttons (upload/download/delete) revealed on card hover
+- [x] **DISP-04**: User sees action buttons (upload/download/delete) revealed on card hover
 - [ ] **DISP-05**: User can filter files by name using a search input in the header
 - [x] **DISP-06**: User sees an empty state message when no files exist
 - [x] **DISP-07**: User sees a loading indicator while files are being fetched
@@ -75,12 +75,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | LAYOUT-01 | Phase 1 | Complete |
 | LAYOUT-02 | Phase 1 | Partial |
-| LAYOUT-03 | Phase 4 | Pending |
+| LAYOUT-03 | Phase 4 | Complete |
 | LAYOUT-04 | Phase 3 | Complete |
 | DISP-01 | Phase 2 | Complete |
 | DISP-02 | Phase 2 | Complete |
 | DISP-03 | Phase 2 | Complete |
-| DISP-04 | Phase 4 | Pending |
+| DISP-04 | Phase 4 | Complete |
 | DISP-05 | Phase 4 | Pending |
 | DISP-06 | Phase 2 | Complete |
 | DISP-07 | Phase 2 | Complete |
