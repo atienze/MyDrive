@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-15)
 Phase: 4 of 4 (Mobile + Search)
 Plan: 1 of 2 completed in current phase
 Status: In progress
-Last activity: 2026-03-26 — Completed 04-01: Mobile bottom nav, FAB, hover-reveal cards
+Last activity: 2026-03-26 - Completed quick task 9: Fix search to filter nested files and improve FAB upload UX
 Progress: [███████░░░] 67%
 
 ## Performance Metrics
@@ -89,6 +89,8 @@ None yet.
 | 3 | Minimize file card UI — reduce badge, button, and size text prominence | 2026-03-24 | b2a06ef | [3-minimize-file-card-ui-reduce-badge-butto](./quick/3-minimize-file-card-ui-reduce-badge-butto/) |
 | 4 | Wire device_name into /api/status so isMine works for Remove + (you) badge | 2026-03-25 | 17c8f00 | [4-fix-push-pull-button-logic-or-complete-p](./quick/4-fix-push-pull-button-logic-or-complete-p/) |
 | 6 | Fix SQL ON CONFLICT error on push and prevent local deletions from cascading to server | 2026-03-25 | a2322fd | [6-fix-sql-on-conflict-error-on-push-and-pr](./quick/6-fix-sql-on-conflict-error-on-push-and-pr/) |
+| 9 | Fix search to filter nested files and improve FAB upload UX | 2026-03-26 | d1e47d8 | [9-fix-search-to-filter-nested-files-and-im](./quick/9-fix-search-to-filter-nested-files-and-im/) |
+| 10 | Fix file filter to search directories recursively and FAB import | 2026-03-26 | 00e0dc2 | [10-fix-file-filter-to-search-directories-an](./quick/10-fix-file-filter-to-search-directories-an/) |
 
 ## Session Continuity
 
