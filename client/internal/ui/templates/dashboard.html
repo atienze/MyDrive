@@ -58,7 +58,7 @@
                     <div id="header-title" class="text-lg font-semibold">All Files</div>
                 </div>
                 <div class="flex-1 max-w-xs mx-4 hidden sm:block">
-                    <input type="search" id="search-input" placeholder="Filter files..."
+                    <input type="search" id="search-input" placeholder="Search all files..."
                            oninput="updateSearch(this.value)"
                            class="w-full bg-[#0f1a2e] border border-[#2a2a4a] rounded-md px-3 py-1.5 text-sm text-[#d0d8f0] placeholder-[#556] focus:outline-none focus:border-[#4d9eff44]">
                 </div>
@@ -419,24 +419,29 @@
         }
 
         function rerenderLocal() {
-            var entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
+            var entries;
             if (searchQuery) {
-                entries = { folders: [], files: entries.files.filter(function(f) {
+                var matchingFiles = cachedClientFiles.filter(function(f) {
                     return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
-                }) };
+                });
+                entries = { folders: [], files: matchingFiles };
+            } else {
+                entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
             }
             var bcHtml = breadcrumbHtml(localCurrentPath, 'local');
             document.getElementById('local-breadcrumb').innerHTML = bcHtml;
 
             var html = '';
-            entries.folders.forEach(function(folderName) {
-                var folderPath = localCurrentPath + folderName + '/';
-                var count = folderFileCount(cachedClientFiles, folderPath);
-                html += renderFolderCard(folderName, count, "navToLocal('" + escapeHtml(folderPath) + "')");
-            });
+            if (!searchQuery) {
+                entries.folders.forEach(function(folderName) {
+                    var folderPath = localCurrentPath + folderName + '/';
+                    var count = folderFileCount(cachedClientFiles, folderPath);
+                    html += renderFolderCard(folderName, count, "navToLocal('" + escapeHtml(folderPath) + "')");
+                });
+            }
             entries.files.forEach(function(f) {
                 var status = computeStatus(cachedLocalMap, cachedServerMap, f.rel_path);
-                var displayName = f.rel_path.substring(localCurrentPath.length);
+                var displayName = searchQuery ? f.rel_path : f.rel_path.substring(localCurrentPath.length);
                 html += renderLocalCard(f, status, displayName);
             });
 
@@ -604,23 +609,28 @@
                 var count = groups[device].length;
                 var countBadge = '<span class="ml-auto text-[10px] font-medium text-[#556] normal-case tracking-normal">' + count + ' file' + (count === 1 ? '' : 's') + '</span>';
                 var devicePath = serverCurrentPaths[device] || '';
-                var entries = getEntriesAtPath(groups[device], devicePath);
+                var entries;
                 if (searchQuery) {
-                    entries = { folders: [], files: entries.files.filter(function(f) {
+                    var matchingFiles = groups[device].filter(function(f) {
                         return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
-                    }) };
+                    });
+                    entries = { folders: [], files: matchingFiles };
+                } else {
+                    entries = getEntriesAtPath(groups[device], devicePath);
                 }
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
                 html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
                 html += breadcrumbHtml(devicePath, 'server', device);
                 html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
-                entries.folders.forEach(function(folderName) {
-                    var folderPath = devicePath + folderName + '/';
-                    var folderCount = folderFileCount(groups[device], folderPath);
-                    html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(device) + "', '" + escapeHtml(folderPath) + "')");
-                });
+                if (!searchQuery) {
+                    entries.folders.forEach(function(folderName) {
+                        var folderPath = devicePath + folderName + '/';
+                        var folderCount = folderFileCount(groups[device], folderPath);
+                        html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(device) + "', '" + escapeHtml(folderPath) + "')");
+                    });
+                }
                 entries.files.forEach(function(f) {
-                    var displayName = f.rel_path.substring(devicePath.length);
+                    var displayName = searchQuery ? f.rel_path : f.rel_path.substring(devicePath.length);
                     html += renderServerCard(f, localMap, device, isMine, displayName);
                 });
                 if (entries.folders.length === 0 && entries.files.length === 0) {
