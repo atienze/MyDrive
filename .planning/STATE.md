@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-26T07:26:58.364Z"
-last_activity: "2026-03-25 — Completed quick task 6: Fix SQL ON CONFLICT error and local deletion cascade"
+stopped_at: "Checkpoint 04-02 Task 2: awaiting human verification of Phase 4 features"
+last_updated: "2026-03-26T07:30:40.162Z"
+last_activity: "2026-03-26 — Completed 04-01: Mobile bottom nav, FAB, hover-reveal cards"
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 67
 ---
 
@@ -51,6 +51,7 @@ Progress: [███████░░░] 67%
 
 *Updated after each plan completion*
 | Phase 04-mobile-search P01 | 2m | 2 tasks | 1 files |
+| Phase 04-mobile-search P02 | 3m | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,7 @@ Recent decisions affecting current work:
 - Phase 3 Plan 1: switchView() is single source of truth for view state — both sidebar nav and new tab toggle sync from it
 - [Phase 04-mobile-search]: showFeedback() extended for FAB standalone context using fixed-position floating label
 - [Phase 04-mobile-search]: Bottom nav uses lg:hidden so sidebar remains primary on desktop; hamburger retained for brand/device info
+- [Phase 04-mobile-search]: searchQuery global reread by rerenderLocal/rerenderServer on each call; filter creates new entries object so clearing restores full list without refetch
 
 ### Pending Todos
 
@@ -90,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T07:26:58.361Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-26T07:30:40.159Z
+Stopped at: Checkpoint 04-02 Task 2: awaiting human verification of Phase 4 features
 Resume file: None
