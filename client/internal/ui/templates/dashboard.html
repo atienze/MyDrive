@@ -77,7 +77,7 @@
             </header>
 
             <!-- Content area -->
-            <main class="flex-1 overflow-y-auto p-4 min-h-0">
+            <main class="flex-1 overflow-y-auto p-4 min-h-0 pb-16 lg:pb-4">
                 <!-- Error banner -->
                 <div id="error-banner" class="bg-[#3a1c1c] border border-[#f24c4c44] rounded-md px-4 py-3 mb-4 text-[13px] text-[#f24c4c] hidden"></div>
 
@@ -145,6 +145,26 @@
             </main>
         </div>
     </div>
+
+    <!-- FAB: floating action button for quick upload on mobile -->
+    <button id="fab-btn" onclick="document.getElementById('fab-file-input').click()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Push a local file to server">+</button>
+    <input id="fab-file-input" type="file" class="hidden" onchange="handleFabFileSelect(this)">
+
+    <!-- Bottom navigation bar: mobile only -->
+    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-[#16213e] border-t border-[#2a2a4a] flex lg:hidden z-50 pb-[env(safe-area-inset-bottom,0px)]">
+        <div id="bnav-all" onclick="switchView('all')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#4d9eff]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            <span>All</span>
+        </div>
+        <div id="bnav-local" onclick="switchView('local')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#888]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            <span>Local</span>
+        </div>
+        <div id="bnav-server" onclick="switchView('server')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#888]">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+            <span>Server</span>
+        </div>
+    </nav>
 
     <script>
         // ---- global state ----
@@ -222,6 +242,15 @@
                     if (item.className.indexOf('hover:bg-[#1a1a2e]') === -1) {
                         item.className += ' hover:bg-[#1a1a2e]';
                     }
+                }
+            });
+
+            // Update bottom nav active state
+            ['all', 'local', 'server'].forEach(function(v) {
+                var tab = document.getElementById('bnav-' + v);
+                if (tab) {
+                    tab.classList.remove('text-[#4d9eff]', 'text-[#888]');
+                    tab.classList.add(v === view ? 'text-[#4d9eff]' : 'text-[#888]');
                 }
             });
 
@@ -728,10 +757,26 @@
 
         // ---- per-file operations ----
 
-        // Show inline feedback on the card containing the clicked button
+        // Show inline feedback on the card containing the clicked button.
+        // If the button is not inside a data-card (e.g. FAB), show a temporary
+        // floating label above the button instead.
         function showFeedback(btn, msg, isError) {
             var card = btn.closest('[data-card]');
-            if (!card) return;
+            if (!card) {
+                // FAB / standalone button: show a floating label
+                var existing = btn.parentElement && btn.parentElement.querySelector('[data-feedback]');
+                if (existing) existing.remove();
+                var span = document.createElement('span');
+                span.style.cssText = 'position:fixed;bottom:90px;right:16px;z-index:200;padding:4px 10px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;';
+                span.style.background = isError ? '#3a1c1c' : '#0d2e1c';
+                span.style.color = isError ? '#f24c4c' : '#00d26a';
+                span.style.border = isError ? '1px solid #f24c4c44' : '1px solid #00d26a44';
+                span.textContent = msg;
+                span.dataset.feedback = 'true';
+                document.body.appendChild(span);
+                setTimeout(function() { if (span.parentNode) span.remove(); }, 3000);
+                return;
+            }
             var existing = card.querySelector('[data-feedback]');
             if (existing) existing.remove();
             var span = document.createElement('span');
@@ -767,6 +812,27 @@
                 btn.textContent = origText;
                 setButtonsDisabled(false);
             }
+        }
+
+        function handleFabFileSelect(input) {
+            var file = input.files[0];
+            if (!file) return;
+            var name = file.name;
+            var match = cachedClientFiles.find(function(f) {
+                return f.rel_path.split('/').pop() === name;
+            });
+            input.value = '';
+            var fabBtn = document.getElementById('fab-btn');
+            if (!match) {
+                showFeedback(fabBtn, 'Not in sync dir', true);
+                return;
+            }
+            var status = computeStatus(cachedLocalMap, cachedServerMap, match.rel_path);
+            if (status === 'synced') {
+                showFeedback(fabBtn, 'Already synced', false);
+                return;
+            }
+            doUpload(match.rel_path, fabBtn);
         }
 
         async function doDownload(relPath, btn) {
