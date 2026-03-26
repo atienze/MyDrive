@@ -6,18 +6,17 @@ import (
 	"log"
 	"time"
 
-	_ "modernc.org/sqlite" // The underscore means: import this for its side effects
-	// (it registers the "sqlite" driver) but don't use it directly
+	_ "modernc.org/sqlite" // registers the "sqlite" driver as a side effect
 )
 
-// DB is our database handle. Every other file in the server will use this.
-// Think of it as the object that holds the connection to SQLite open.
+// DB holds the connection to the SQLite database and exposes all file and
+// device operations used by the server.
 type DB struct {
-	conn *sql.DB // sql.DB is Go's standard database connection type
+	conn *sql.DB
 }
 
-// FileRecord represents one row in our 'files' table.
-// When we read a file out of the database, it comes back as one of these.
+// FileRecord represents one row in the files table, including metadata about
+// the synced file and which device owns it.
 type FileRecord struct {
 	ID         int64
 	RelPath    string
@@ -28,36 +27,32 @@ type FileRecord struct {
 	Deleted    bool
 }
 
-// Open opens (or creates) the SQLite database at the given file path.
-// Call this once when the server starts up.
+// Open opens (or creates) the SQLite database at the given file path,
+// applies any pending schema migrations, and returns a ready-to-use DB.
+// Call this once at server startup.
 func Open(path string) (*DB, error) {
-	// sql.Open doesn't actually connect yet — it just sets up the config.
-	// The "sqlite" string tells Go which database driver to use (the one we imported above).
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// sql.Ping() actually tries to connect and will fail fast if something is wrong.
 	if err := conn.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// SQLite has one important quirk: it only supports ONE writer at a time.
-	// SetMaxOpenConns(1) tells Go's connection pool to never open more than
-	// one connection at a time, which prevents "database is locked" errors.
+	// SQLite supports only one concurrent writer. SetMaxOpenConns(1) prevents
+	// "database is locked" errors under concurrent HTTP handler goroutines.
 	conn.SetMaxOpenConns(1)
 
 	db := &DB{conn: conn}
 
-	// Run our table creation SQL. This is safe to call every startup —
-	// "CREATE TABLE IF NOT EXISTS" means it only creates if it doesn't exist.
+	// createTables uses CREATE TABLE IF NOT EXISTS so it is safe to call on every startup.
 	if err := db.createTables(); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	// Run schema migrations for pre-existing databases that may have been created
-	// with an older schema (e.g. UNIQUE(rel_path) alone instead of UNIQUE(rel_path, device_id)).
+	// migrateSchema upgrades pre-existing databases that may have been created with
+	// an older schema (e.g. UNIQUE(rel_path) alone instead of UNIQUE(rel_path, device_id)).
 	if err := db.migrateSchema(); err != nil {
 		return nil, fmt.Errorf("failed to migrate schema: %w", err)
 	}
@@ -72,32 +67,28 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
-// createTables runs the SQL that creates our schema.
-// Using backticks (`) in Go lets us write multi-line strings — perfect for SQL.
+// createTables creates the files and devices tables if they do not already exist.
+// It is safe to call on every startup.
 func (db *DB) createTables() error {
 	schema := `
-    -- Tracks every file the server has received (v3: composite unique per device)
     CREATE TABLE IF NOT EXISTS files (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        rel_path    TEXT NOT NULL,          -- e.g. "Documents/resume.pdf"
-        hash        TEXT NOT NULL,          -- SHA-256 of the file content
-        size        INTEGER NOT NULL,       -- file size in bytes
-        device_id   TEXT NOT NULL,          -- which device sent this
+        rel_path    TEXT NOT NULL,
+        hash        TEXT NOT NULL,
+        size        INTEGER NOT NULL,
+        device_id   TEXT NOT NULL,
         uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        deleted     BOOLEAN DEFAULT FALSE,  -- soft delete flag
+        deleted     BOOLEAN DEFAULT FALSE,
         UNIQUE(rel_path, device_id)
     );
 
-    -- Tracks registered devices (we'll fill this more in Phase 2)
     CREATE TABLE IF NOT EXISTS devices (
-        id         TEXT PRIMARY KEY,        -- will become the auth token in Phase 2
+        id         TEXT PRIMARY KEY,
         name       TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     `
 
-	// Exec runs SQL that doesn't return rows (CREATE, INSERT, UPDATE, DELETE).
-	// For queries that return rows, we'd use Query() or QueryRow() instead.
 	_, err := db.conn.Exec(schema)
 	return err
 }
@@ -171,17 +162,10 @@ func (db *DB) migrateSchema() error {
 	return nil
 }
 
-// ----------------------------------------
-// FILE OPERATIONS
-// ----------------------------------------
-
-// UpsertFile inserts a new file record, or updates it if the path already exists.
-// "Upsert" = "Update or Insert" — a common database pattern.
-// We use this so re-syncing the same file updates the hash instead of erroring.
+// UpsertFile inserts a new file record for the given device, or updates the
+// existing record if (rel_path, device_id) already exists. Re-syncing the same
+// file updates the hash and size rather than returning an error.
 func (db *DB) UpsertFile(relPath, hash, deviceID string, size int64) error {
-	// The ? marks are placeholders — Go fills them in with our values in order.
-	// NEVER build SQL by string concatenation (e.g. "... WHERE path = " + path)
-	// That would be vulnerable to SQL injection. Always use placeholders.
 	query := `
     INSERT INTO files (rel_path, hash, size, device_id, uploaded_at, deleted)
     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, FALSE)
@@ -191,8 +175,6 @@ func (db *DB) UpsertFile(relPath, hash, deviceID string, size int64) error {
         uploaded_at = CURRENT_TIMESTAMP,
         deleted     = FALSE
     `
-	// "excluded.hash" is SQLite syntax meaning "the hash value we tried to insert"
-	// So ON CONFLICT means: if rel_path already exists, update the other fields.
 
 	_, err := db.conn.Exec(query, relPath, hash, size, deviceID)
 	if err != nil {
@@ -201,9 +183,9 @@ func (db *DB) UpsertFile(relPath, hash, deviceID string, size int64) error {
 	return nil
 }
 
-// FileExists checks if we already have a file with this exact path AND hash.
-// Returns true if the file is already stored and unchanged — meaning skip it.
-// Returns false if we need the file (new file, or file has changed).
+// FileExists reports whether the server already has a non-deleted record for
+// the given (relPath, hash, deviceID) triplet. Returns true when the file is
+// already stored and unchanged; the client can skip re-uploading it.
 func (db *DB) FileExists(relPath, hash, deviceID string) (bool, error) {
 	query := `
     SELECT COUNT(*) FROM files
@@ -219,8 +201,7 @@ func (db *DB) FileExists(relPath, hash, deviceID string) (bool, error) {
 	return count > 0, nil
 }
 
-// GetAllFiles returns every non-deleted file in the database.
-// We'll use this in Phase 5 for bidirectional sync.
+// GetAllFiles returns every non-deleted file in the database, ordered by relative path.
 func (db *DB) GetAllFiles() ([]FileRecord, error) {
 	query := `
     SELECT id, rel_path, hash, size, device_id, uploaded_at
@@ -229,15 +210,14 @@ func (db *DB) GetAllFiles() ([]FileRecord, error) {
     ORDER BY rel_path
     `
 
-	// Query returns multiple rows, unlike QueryRow which returns one.
 	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("get all files: %w", err)
 	}
-	defer rows.Close() // Always close rows when done — this releases the connection
+	defer rows.Close()
 
 	var files []FileRecord
-	for rows.Next() { // rows.Next() advances to the next row, returns false when done
+	for rows.Next() {
 		var f FileRecord
 		err := rows.Scan(
 			&f.ID,
@@ -253,8 +233,6 @@ func (db *DB) GetAllFiles() ([]FileRecord, error) {
 		files = append(files, f)
 	}
 
-	// rows.Err() catches any error that happened DURING iteration
-	// (rows.Next() swallows errors — you have to check here)
 	return files, rows.Err()
 }
 
@@ -365,12 +343,8 @@ func (db *DB) GetSharedFiles(excludeDeviceID string) ([]FileRecord, error) {
 	return files, rows.Err()
 }
 
-// ----------------------------------------
-// DEVICE OPERATIONS (used more in Phase 2)
-// ----------------------------------------
-
-// RegisterDevice creates a new device record.
-// The id will eventually be the auth token.
+// RegisterDevice creates a new device record with the given token as its primary key.
+// If a record with the same id already exists, the insert is silently ignored.
 func (db *DB) RegisterDevice(id, name string) error {
 	query := `
     INSERT INTO devices (id, name, created_at)
@@ -381,8 +355,7 @@ func (db *DB) RegisterDevice(id, name string) error {
 	return err
 }
 
-// DeviceExists checks if a device ID is registered.
-// We'll use this in Phase 2 for auth — if the token isn't registered, reject.
+// DeviceExists reports whether a device with the given ID is registered.
 func (db *DB) DeviceExists(id string) (bool, error) {
 	var count int
 	err := db.conn.QueryRow(

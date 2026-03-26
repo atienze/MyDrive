@@ -8,11 +8,12 @@ import (
 	"github.com/atienze/HomelabSecureSync/common/crypto"
 )
 
-// FileMeta represents one file we found
+// FileMeta represents a single file discovered during a directory scan,
+// including its relative path, SHA-256 hash, and size in bytes.
 type FileMeta struct {
-	Path string // "Folder/resume.pdf"
-	Hash string // "a1b2c3d4..."
-	Size int64  // Bytes
+	Path string // relative path within the sync directory, e.g. "folder/resume.pdf"
+	Hash string // SHA-256 hex digest of the file content
+	Size int64  // file size in bytes
 }
 
 // ScanDirectory walks through a folder and fingerprints every file (verbose).

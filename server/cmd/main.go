@@ -12,11 +12,15 @@ import (
 	"github.com/atienze/HomelabSecureSync/server/internal/store"
 )
 
+// Port is the TCP address the server listens on.
 const Port = ":9000"
 
-// DatabasePath and VaultDataDir can be overridden via environment variables
-// for deployment (e.g., on a homelab server). Defaults to relative paths.
+// DatabasePath is the SQLite database file path.
+// Override with the VAULTSYNC_DB_PATH environment variable for deployment.
 var DatabasePath = envOrDefault("VAULTSYNC_DB_PATH", "./vaultsync.db")
+
+// VaultDataDir is the root directory for content-addressable blob storage.
+// Override with the VAULTSYNC_DATA_DIR environment variable for deployment.
 var VaultDataDir = envOrDefault("VAULTSYNC_DATA_DIR", "./VaultData")
 
 func envOrDefault(key, fallback string) string {
@@ -69,7 +73,7 @@ func runRegister() {
 		log.Fatalf("Failed to register device: %v", err)
 	}
 
-	// Print the token ONCE — this is the only time it appears in plaintext.
+	// Print the token once — this is the only time it appears in plaintext.
 	// The caller must save it to ~/.vaultsync/config.toml immediately.
 	fmt.Println(token)
 }

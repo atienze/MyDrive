@@ -11,10 +11,11 @@ import (
 	"github.com/atienze/HomelabSecureSync/common/protocol"
 )
 
-// SendFile streams the file in chunks
+// SendFile opens the file at rootDir/path and streams it to the server in 4MB chunks.
+// It first sends a CmdSendFile header packet with the metadata, then sends
+// one CmdFileChunk packet per chunk until the file is fully transferred.
 func SendFile(encoder *gob.Encoder, rootDir string, path string, hash string, size int64) error {
 
-	// 1. Open the file
 	fullPath := filepath.Join(rootDir, path)
 	file, err := os.Open(fullPath)
 	if err != nil {
@@ -22,7 +23,6 @@ func SendFile(encoder *gob.Encoder, rootDir string, path string, hash string, si
 	}
 	defer file.Close()
 
-	// 2. Send the Header (Metadata)
 	ft := protocol.FileTransfer{
 		RelPath: path,
 		Hash:    hash,
@@ -34,7 +34,6 @@ func SendFile(encoder *gob.Encoder, rootDir string, path string, hash string, si
 		return err
 	}
 
-	// Direct Encode (No Protocol Wrapper needed if using raw Gob)
 	headerPacket := protocol.Packet{
 		Cmd:     protocol.CmdSendFile,
 		Payload: headerBuf.Bytes(),
@@ -44,7 +43,6 @@ func SendFile(encoder *gob.Encoder, rootDir string, path string, hash string, si
 		return err
 	}
 
-	// 3. Stream the Data
 	buffer := make([]byte, 4*1024*1024) // 4MB chunks
 
 	for {
@@ -69,7 +67,8 @@ func SendFile(encoder *gob.Encoder, rootDir string, path string, hash string, si
 	return nil
 }
 
-// VerifyFile checks if the server needs the file
+// VerifyFile sends a CmdCheckFile request and returns true if the server
+// needs the file (i.e. it does not already have it), or false if it can skip.
 func VerifyFile(encoder *gob.Encoder, decoder *protocol.Decoder, path string, hash string) (bool, error) {
 	req := protocol.CheckFileRequest{RelPath: path, Hash: hash}
 

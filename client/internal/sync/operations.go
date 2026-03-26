@@ -41,9 +41,9 @@ const (
 // VaultSync token auth handshake. Returns (conn, encoder, decoder, nil) on
 // success. The caller is responsible for closing conn.
 //
-// NOTE: This function does NOT set conn.SetDeadline — callers are expected to
-// call conn.SetDeadline(time.Now().Add(opDeadline)) immediately after receiving
-// the connection, because the correct deadline depends on the operation being
+// DialAndHandshake does not set a deadline on the connection. Callers must call
+// conn.SetDeadline(time.Now().Add(opDeadline)) immediately after receiving the
+// connection, because the appropriate deadline depends on the operation being
 // performed.
 func DialAndHandshake(cfg *config.Config) (net.Conn, *gob.Encoder, *protocol.Decoder, error) {
 	conn, err := net.DialTimeout("tcp", cfg.ServerAddr, dialTimeout)
@@ -115,7 +115,7 @@ func FetchServerFileList(cfg *config.Config) ([]protocol.ServerFileEntry, error)
 // CmdCheckFile verify step — the user explicitly requested this upload.
 // Updates state and persists it to disk on success.
 func UploadSingleFile(cfg *config.Config, st *state.LocalState, statePath, relPath string) error {
-	conn, encoder, _, err := DialAndHandshake(cfg)
+	conn, encoder, decoder, err := DialAndHandshake(cfg)
 	if err != nil {
 		return err
 	}
@@ -140,6 +140,27 @@ func UploadSingleFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 
 	if err := sender.SendFile(encoder, cfg.SyncDir, relPath, hash, size); err != nil {
 		return fmt.Errorf("send file: %w", err)
+	}
+
+	// After sending, issue a CmdCheckFile for the same path+hash. The server
+	// processes commands sequentially, so by the time it responds the upload
+	// has been committed to the DB. Without this round-trip the function
+	// returns before the server finishes writing, and an immediate file-list
+	// refresh may not see the new file.
+	checkReq := protocol.CheckFileRequest{RelPath: relPath, Hash: hash}
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(checkReq); err != nil {
+		return fmt.Errorf("encode check request: %w", err)
+	}
+	if err := encoder.Encode(protocol.Packet{
+		Cmd:     protocol.CmdCheckFile,
+		Payload: buf.Bytes(),
+	}); err != nil {
+		return fmt.Errorf("send check request: %w", err)
+	}
+	var respPacket protocol.Packet
+	if err := decoder.Decode(&respPacket); err != nil {
+		return fmt.Errorf("read check response: %w", err)
 	}
 
 	st.SetFile(relPath, hash)

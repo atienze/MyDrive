@@ -11,6 +11,8 @@ import (
 	"github.com/atienze/HomelabSecureSync/server/internal/store"
 )
 
+// Migration path constants define the source and destination directories used
+// when migrating from path-based storage to content-addressable storage.
 const (
 	OldUploadsDir = "./uploads"
 	NewVaultDir   = "./VaultData"
