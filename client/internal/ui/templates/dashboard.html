@@ -428,7 +428,7 @@
             } else {
                 entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
             }
-            var bcHtml = breadcrumbHtml(localCurrentPath, 'local');
+            var bcHtml = searchQuery ? '' : breadcrumbHtml(localCurrentPath, 'local');
             document.getElementById('local-breadcrumb').innerHTML = bcHtml;
 
             var html = '';
@@ -620,7 +620,7 @@
                 }
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
                 html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
-                html += breadcrumbHtml(devicePath, 'server', device);
+                if (!searchQuery) html += breadcrumbHtml(devicePath, 'server', device);
                 html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
                 if (!searchQuery) {
                     entries.folders.forEach(function(folderName) {
