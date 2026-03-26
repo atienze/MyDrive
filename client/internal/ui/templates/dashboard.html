@@ -57,6 +57,11 @@
                     </button>
                     <div id="header-title" class="text-lg font-semibold">All Files</div>
                 </div>
+                <div class="flex-1 max-w-xs mx-4 hidden sm:block">
+                    <input type="search" id="search-input" placeholder="Filter files..."
+                           oninput="updateSearch(this.value)"
+                           class="w-full bg-[#0f1a2e] border border-[#2a2a4a] rounded-md px-3 py-1.5 text-sm text-[#d0d8f0] placeholder-[#556] focus:outline-none focus:border-[#4d9eff44]">
+                </div>
                 <div class="flex items-center gap-4">
                     <!-- Sync stats -->
                     <div class="text-xs text-[#888] hidden sm:flex items-center gap-1.5">
@@ -178,6 +183,15 @@
         var cachedServerFiles = [];
         var cachedLocalMap = {};
         var cachedServerMap = {};
+
+        // ---- search state ----
+        var searchQuery = '';
+
+        function updateSearch(val) {
+            searchQuery = val.trim().toLowerCase();
+            rerenderLocal();
+            rerenderServer();
+        }
 
         // ---- sidebar toggle (mobile) ----
         function toggleSidebar() {
@@ -406,6 +420,11 @@
 
         function rerenderLocal() {
             var entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
+            if (searchQuery) {
+                entries = { folders: [], files: entries.files.filter(function(f) {
+                    return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
+                }) };
+            }
             var bcHtml = breadcrumbHtml(localCurrentPath, 'local');
             document.getElementById('local-breadcrumb').innerHTML = bcHtml;
 
@@ -423,7 +442,9 @@
 
             var localList = document.getElementById('local-file-list');
             if (!html) {
-                if (cachedClientFiles.length === 0) {
+                if (searchQuery) {
+                    localList.innerHTML = '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
+                } else if (cachedClientFiles.length === 0) {
                     localList.innerHTML = emptyStateHtml('local');
                 } else {
                     localList.innerHTML = '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
@@ -584,6 +605,11 @@
                 var countBadge = '<span class="ml-auto text-[10px] font-medium text-[#556] normal-case tracking-normal">' + count + ' file' + (count === 1 ? '' : 's') + '</span>';
                 var devicePath = serverCurrentPaths[device] || '';
                 var entries = getEntriesAtPath(groups[device], devicePath);
+                if (searchQuery) {
+                    entries = { folders: [], files: entries.files.filter(function(f) {
+                        return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
+                    }) };
+                }
                 html += '<div class="border-b-2 border-[#2a2a4a]">';
                 html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
                 html += breadcrumbHtml(devicePath, 'server', device);
@@ -598,7 +624,11 @@
                     html += renderServerCard(f, localMap, device, isMine, displayName);
                 });
                 if (entries.folders.length === 0 && entries.files.length === 0) {
-                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
+                    if (searchQuery) {
+                        html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
+                    } else {
+                        html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
+                    }
                 }
                 html += '</div>';
                 html += '</div>';
