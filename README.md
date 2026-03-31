@@ -138,39 +138,6 @@ device_name = "MyLaptop"
 
 Server listens on `:9000`. Web UI listens on `127.0.0.1:9876`.
 
-## Project Structure
-
-myDrive/
-├── common/
-│   ├── crypto/hash.go
-│   └── protocol/
-│       ├── handshake.go
-│       └── packet.go
-├── client/
-│   ├── cmd/main.go
-│   └── internal/
-│       ├── config/config.go
-│       ├── scanner/scan.go
-│       ├── sender/client.go
-│       ├── state/state.go
-│       ├── status/status.go
-│       ├── sync/
-│       │   ├── bidirectional.go
-│       │   └── operations.go
-│       └── ui/
-│           ├── server.go
-│           └── templates/dashboard.html
-└── server/
-    ├── cmd/
-    │   ├── main.go
-    │   ├── migrate/main.go
-    │   └── migrate-v3/main.go
-    └── internal/
-        ├── auth/register.go
-        ├── db/db.go
-        ├── receiver/handler.go
-        └── store/store.go
-
 ## Security Notes
 
 - `config.toml` contains the auth token in plaintext — restrict file permissions on the homelab machine
