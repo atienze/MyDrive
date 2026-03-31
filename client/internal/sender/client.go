@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/atienze/HomelabSecureSync/common/protocol"
+	"github.com/atienze/myDrive/common/protocol"
 )
 
 // SendFile opens the file at rootDir/path and streams it to the server in 4MB chunks.

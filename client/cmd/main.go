@@ -14,17 +14,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/atienze/HomelabSecureSync/client/internal/config"
-	"github.com/atienze/HomelabSecureSync/client/internal/state"
-	"github.com/atienze/HomelabSecureSync/client/internal/status"
-	bisync "github.com/atienze/HomelabSecureSync/client/internal/sync"
-	"github.com/atienze/HomelabSecureSync/client/internal/ui"
-	"github.com/atienze/HomelabSecureSync/common/protocol"
+	"github.com/atienze/myDrive/client/internal/config"
+	"github.com/atienze/myDrive/client/internal/state"
+	"github.com/atienze/myDrive/client/internal/status"
+	bisync "github.com/atienze/myDrive/client/internal/sync"
+	"github.com/atienze/myDrive/client/internal/ui"
+	"github.com/atienze/myDrive/common/protocol"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "Usage: vault-sync <sync|daemon|pull>")
+		fmt.Fprintln(os.Stderr, "Usage: mydrive <sync|daemon|pull>")
 		os.Exit(1)
 	}
 
@@ -36,14 +36,14 @@ func main() {
 	case "pull":
 		runPull(os.Args[2:])
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: vault-sync <sync|daemon|pull>\n", os.Args[1])
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\nUsage: mydrive <sync|daemon|pull>\n", os.Args[1])
 		os.Exit(1)
 	}
 }
 
 // runSync performs a single push-only sync cycle and exits.
 func runSync() {
-	fmt.Println("--- VaultSync: Push Sync ---")
+	fmt.Println("--- myDrive: Push Sync ---")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -66,7 +66,7 @@ func runPull(args []string) {
 	fs.Parse(args)
 
 	if *fromDevice == "" || fs.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: vault-sync pull --from <device> <path>")
+		fmt.Fprintln(os.Stderr, "Usage: mydrive pull --from <device> <path>")
 		os.Exit(1)
 	}
 	relPath := fs.Arg(0)
@@ -91,10 +91,10 @@ func runPull(args []string) {
 	fmt.Printf("Pulled: %s (from %s)\n", relPath, *fromDevice)
 }
 
-// runDaemon starts the web UI, performs an initial sync, then waits for
-// "Sync Now" triggers from the dashboard or a shutdown signal.
+// runDaemon starts the web UI and waits for "Full Sync" triggers from the
+// dashboard or a shutdown signal. No sync runs automatically on startup.
 func runDaemon() {
-	fmt.Println("--- VaultSync: Daemon Mode ---")
+	fmt.Println("--- myDrive: Daemon Mode ---")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -129,11 +129,7 @@ func runDaemon() {
 	// Open browser (best-effort, non-fatal on error).
 	exec.Command("open", "http://localhost:9876").Start()
 
-	// Initial sync — non-fatal on error so the daemon stays alive.
-	appStatus.AddActivity("Daemon started, running initial sync...")
-	syncMu.Lock()
-	doSyncCycle(cfg, appStatus, st, statePath)
-	syncMu.Unlock()
+	appStatus.AddActivity("Daemon started. Use 'Full Sync' to sync.")
 
 	// Wait for force-sync triggers or shutdown signal.
 	sigCh := make(chan os.Signal, 1)
@@ -159,7 +155,7 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 	appStatus.SetSyncing(true)
 	appStatus.AddActivity("Starting sync cycle...")
 
-	uploaded, err := runSyncCycleWithState(cfg, st, statePath)
+	uploaded, downloaded, err := runSyncCycleWithState(cfg, st, statePath)
 
 	appStatus.SetSyncing(false)
 	appStatus.SetLastSync(uploaded, err)
@@ -170,7 +166,7 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 		log.Printf("Sync failed: %v", err)
 	} else {
 		appStatus.SetConnected(true)
-		appStatus.AddActivity(fmt.Sprintf("Sync complete: %d uploaded", uploaded))
+		appStatus.AddActivity(fmt.Sprintf("Sync complete: %d uploaded, %d downloaded", uploaded, downloaded))
 		updateStorageStats(cfg, appStatus, st)
 	}
 }
@@ -189,17 +185,17 @@ func updateStorageStats(cfg *config.Config, appStatus *status.Status, st *state.
 	appStatus.SetStorageStats(totalFiles, totalSize)
 }
 
-// runSyncCycleWithState opens a connection, performs a push-only sync
+// runSyncCycleWithState opens a connection, performs a bidirectional sync
 // using the provided shared state, and closes. Used by the daemon to avoid
 // per-cycle state.Load() calls and prevent races with UI state mutations.
-func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath string) (int, error) {
+func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath string) (int, int, error) {
 	fmt.Printf("Sync dir: %s\n", cfg.SyncDir)
 	fmt.Printf("Server:   %s\n", cfg.ServerAddr)
 
 	// Connect to the server.
 	conn, err := net.Dial("tcp", cfg.ServerAddr)
 	if err != nil {
-		return 0, fmt.Errorf("connect to server: %w", err)
+		return 0, 0, fmt.Errorf("connect to server: %w", err)
 	}
 	defer conn.Close()
 
@@ -213,19 +209,19 @@ func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath s
 		Token:       cfg.Token,
 	}
 	if err := encoder.Encode(shake); err != nil {
-		return 0, fmt.Errorf("handshake: %w", err)
+		return 0, 0, fmt.Errorf("handshake: %w", err)
 	}
 
-	// Run the push-only sync using the shared state.
+	// Run the bidirectional sync using the shared state.
 	start := time.Now()
-	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st)
-	uploaded, err := syncer.RunSync()
+	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st, cfg)
+	uploaded, downloaded, err := syncer.RunSync()
 	if err != nil {
-		return uploaded, err
+		return uploaded, downloaded, err
 	}
 
-	fmt.Printf("Sync took %s\n", time.Since(start))
-	return uploaded, nil
+	fmt.Printf("Sync took %s — uploaded: %d, downloaded: %d\n", time.Since(start), uploaded, downloaded)
+	return uploaded, downloaded, nil
 }
 
 // runSyncCycle opens a connection, performs a push-only sync, and closes.
@@ -264,14 +260,14 @@ func runSyncCycle(cfg *config.Config) (int, error) {
 		return 0, fmt.Errorf("handshake: %w", err)
 	}
 
-	// Run the push-only sync.
+	// Run the bidirectional sync.
 	start := time.Now()
-	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st)
-	uploaded, err := syncer.RunSync()
+	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st, cfg)
+	uploaded, downloaded, err := syncer.RunSync()
 	if err != nil {
 		return uploaded, err
 	}
 
-	fmt.Printf("Sync took %s\n", time.Since(start))
+	fmt.Printf("Sync took %s — uploaded: %d, downloaded: %d\n", time.Since(start), uploaded, downloaded)
 	return uploaded, nil
 }

@@ -6,22 +6,22 @@ import (
 	"net"
 	"os"
 
-	"github.com/atienze/HomelabSecureSync/server/internal/auth"
-	"github.com/atienze/HomelabSecureSync/server/internal/db"
-	"github.com/atienze/HomelabSecureSync/server/internal/receiver"
-	"github.com/atienze/HomelabSecureSync/server/internal/store"
+	"github.com/atienze/myDrive/server/internal/auth"
+	"github.com/atienze/myDrive/server/internal/db"
+	"github.com/atienze/myDrive/server/internal/receiver"
+	"github.com/atienze/myDrive/server/internal/store"
 )
 
 // Port is the TCP address the server listens on.
 const Port = ":9000"
 
 // DatabasePath is the SQLite database file path.
-// Override with the VAULTSYNC_DB_PATH environment variable for deployment.
-var DatabasePath = envOrDefault("VAULTSYNC_DB_PATH", "./vaultsync.db")
+// Override with the MYDRIVE_DB_PATH environment variable for deployment.
+var DatabasePath = envOrDefault("MYDRIVE_DB_PATH", "./mydrive.db")
 
 // VaultDataDir is the root directory for content-addressable blob storage.
-// Override with the VAULTSYNC_DATA_DIR environment variable for deployment.
-var VaultDataDir = envOrDefault("VAULTSYNC_DATA_DIR", "./VaultData")
+// Override with the MYDRIVE_DATA_DIR environment variable for deployment.
+var VaultDataDir = envOrDefault("MYDRIVE_DATA_DIR", "./VaultData")
 
 func envOrDefault(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -39,18 +39,18 @@ func main() {
 			return
 		case "migrate":
 			fmt.Fprintln(os.Stderr, "Migration is a separate binary.")
-			fmt.Fprintln(os.Stderr, "Build and run it with: go build -o vault-migrate ./server/cmd/migrate && ./vault-migrate")
+			fmt.Fprintln(os.Stderr, "Build and run it with: go build -o mydrive-migrate ./server/cmd/migrate && ./mydrive-migrate")
 			os.Exit(1)
 		}
 	}
 	runServer()
 }
 
-// runRegister handles: vault-sync-server register "DeviceName"
+// runRegister handles: mydrive-server register "DeviceName"
 // Generates a cryptographic token, stores it in the DB, and prints it once to stdout.
 func runRegister() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: vault-sync-server register <device-name>")
+		fmt.Fprintln(os.Stderr, "Usage: mydrive-server register <device-name>")
 		os.Exit(1)
 	}
 	deviceName := os.Args[2]
@@ -74,7 +74,7 @@ func runRegister() {
 	}
 
 	// Print the token once — this is the only time it appears in plaintext.
-	// The caller must save it to ~/.vaultsync/config.toml immediately.
+	// The caller must save it to ~/.mydrive/config.toml immediately.
 	fmt.Println(token)
 }
 
@@ -101,7 +101,7 @@ func runServer() {
 	}
 	defer listener.Close()
 
-	log.Printf("Vault-Sync Server listening on %s", Port)
+	log.Printf("myDrive Server listening on %s", Port)
 	log.Printf("Database: %s", DatabasePath)
 	log.Printf("Object store: %s", VaultDataDir)
 	log.Println("Waiting for connections...")

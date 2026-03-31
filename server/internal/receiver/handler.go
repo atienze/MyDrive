@@ -11,9 +11,9 @@ import (
 	"net"
 	"os"
 
-	"github.com/atienze/HomelabSecureSync/common/protocol"
-	"github.com/atienze/HomelabSecureSync/server/internal/db"
-	"github.com/atienze/HomelabSecureSync/server/internal/store"
+	"github.com/atienze/myDrive/common/protocol"
+	"github.com/atienze/myDrive/server/internal/db"
+	"github.com/atienze/myDrive/server/internal/store"
 )
 
 // HandleConnection validates the device token, then processes file sync commands.

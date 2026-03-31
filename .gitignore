@@ -10,9 +10,11 @@ VaultData/
 *.db
 
 # Compiled binaries
-vault-sync
-vault-sync-server
-vault-migrate
+mydrive
+mydrive-server
+mydrive-migrate
+mydrive-ish
+mydrive.exe
 
 # Planning docs (local-only)
 .planning/

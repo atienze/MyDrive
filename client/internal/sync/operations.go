@@ -13,10 +13,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/atienze/HomelabSecureSync/client/internal/config"
-	sender "github.com/atienze/HomelabSecureSync/client/internal/sender"
-	"github.com/atienze/HomelabSecureSync/client/internal/state"
-	"github.com/atienze/HomelabSecureSync/common/protocol"
+	"github.com/atienze/myDrive/client/internal/config"
+	sender "github.com/atienze/myDrive/client/internal/sender"
+	"github.com/atienze/myDrive/client/internal/state"
+	"github.com/atienze/myDrive/common/protocol"
 )
 
 // Sentinel errors for categorized failure handling by callers (e.g. HTTP handlers).
@@ -38,7 +38,7 @@ const (
 )
 
 // DialAndHandshake opens a TCP connection to cfg.ServerAddr and performs the
-// VaultSync token auth handshake. Returns (conn, encoder, decoder, nil) on
+// myDrive token auth handshake. Returns (conn, encoder, decoder, nil) on
 // success. The caller is responsible for closing conn.
 //
 // DialAndHandshake does not set a deadline on the connection. Callers must call
@@ -224,7 +224,7 @@ func DownloadSingleFile(cfg *config.Config, st *state.LocalState, statePath, rel
 		return fmt.Errorf("create parent dirs: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp(filepath.Dir(fullPath), ".vaultsync-dl-*")
+	tmpFile, err := os.CreateTemp(filepath.Dir(fullPath), ".mydrive-dl-*")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
@@ -319,16 +319,6 @@ func DeleteServerFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 		return fmt.Errorf("server rejected delete: %s", resp.Message)
 	}
 
-	// Also remove the local file to prevent re-upload on next sync.
-	// Without this, the file stays on disk, the next sync detects it,
-	// the server says "need it" (record was purged), and it gets re-uploaded.
-	fullPath := filepath.Join(cfg.SyncDir, relPath)
-	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove local copy after server delete: %w", err)
-	}
-	// Clean up empty parent directories left behind.
-	cleanEmptyDirs(filepath.Dir(fullPath), cfg.SyncDir)
-
 	st.RemoveFile(relPath)
 	if err := st.Save(statePath); err != nil {
 		return fmt.Errorf("persist state after delete: %w", err)
@@ -407,7 +397,7 @@ func PullFile(cfg *config.Config, st *state.LocalState, statePath, fromDevice, r
 		return fmt.Errorf("create parent dirs: %w", err)
 	}
 
-	tmpFile, err := os.CreateTemp(filepath.Dir(fullPath), ".vaultsync-dl-*")
+	tmpFile, err := os.CreateTemp(filepath.Dir(fullPath), ".mydrive-dl-*")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}

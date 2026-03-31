@@ -1,5 +1,3 @@
-github.com/atienze/HomelabSecureSync/common v0.0.0-20260126075624-0baf20d792c0 h1:1GV6fVEMDkFFakBH3YwB2T2/6Z7QwutzsD7jCSTAuvg=
-github.com/atienze/HomelabSecureSync/common v0.0.0-20260126075624-0baf20d792c0/go.mod h1:X66f3ifHdtiagytx8gRsT/QlnXJ2PJnyLSBYFLI1R9M=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=

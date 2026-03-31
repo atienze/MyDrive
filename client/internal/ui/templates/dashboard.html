@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaultSync Dashboard</title>
+    <title>myDrive Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',sans-serif] m-0 p-0">
@@ -20,7 +20,7 @@
                 <svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <span class="text-base font-semibold tracking-wide">VaultSync</span>
+                <span class="text-base font-semibold tracking-wide">myDrive</span>
             </div>
             <!-- Navigation -->
             <div>
@@ -80,6 +80,13 @@
                     <button id="sync-btn" onclick="forceSync()" class="bg-[#0f62fe] hover:bg-[#0043ce] text-white text-sm font-medium px-4 py-1.5 rounded-md disabled:bg-[#2a2a4a] disabled:text-[#666] disabled:cursor-not-allowed cursor-pointer border-none">Full Sync</button>
                 </div>
             </header>
+
+            <!-- Mobile search bar (hidden on lg+, shown on mobile where header search is hidden) -->
+            <div class="lg:hidden px-4 py-2 bg-[#16213e] border-b border-[#2a2a4a] shrink-0">
+                <input type="search" placeholder="Search all files..."
+                       oninput="updateSearch(this.value)"
+                       class="w-full bg-[#0f1a2e] border border-[#2a2a4a] rounded-md px-3 py-1.5 text-sm text-[#d0d8f0] placeholder-[#556] focus:outline-none focus:border-[#4d9eff44]">
+            </div>
 
             <!-- Content area -->
             <main class="flex-1 overflow-y-auto p-4 min-h-0 pb-16 lg:pb-4">
@@ -151,9 +158,40 @@
         </div>
     </div>
 
-    <!-- FAB: floating action button for quick upload on mobile -->
-    <button id="fab-btn" onclick="document.getElementById('fab-file-input').click()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Import and push a file to server">+</button>
-    <input id="fab-file-input" type="file" class="hidden" onchange="handleFabFileSelect(this)">
+    <!-- FAB: floating action button for quick push on mobile -->
+    <button id="fab-btn" onclick="openFabModal()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Push unsynced files to server">+</button>
+    <input id="fab-file-input" type="file" multiple class="hidden" onchange="handleFabFileSelect(this)">
+
+    <!-- FAB bottom sheet: lists unsynced local files for quick push -->
+    <div id="fab-modal" class="fixed inset-0 z-[9998] hidden lg:hidden">
+        <div class="absolute inset-0 bg-black/60" onclick="closeFabModal()"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-[#16213e] border-t border-[#2a2a4a] rounded-t-2xl max-h-[70vh] flex flex-col" style="padding-bottom:env(safe-area-inset-bottom,0px)">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-[#2a2a4a] shrink-0">
+                <div>
+                    <div class="text-sm font-semibold text-[#e0e0e0]">Push to Server</div>
+                    <div class="text-[11px] text-[#556] mt-0.5">Local files not yet synced</div>
+                </div>
+                <button onclick="closeFabModal()" class="bg-transparent border-none text-[#888] hover:text-[#ccc] cursor-pointer p-1 text-lg leading-none">&#x2715;</button>
+            </div>
+            <div id="fab-modal-list" class="flex-1 overflow-y-auto p-3"></div>
+            <div class="px-4 py-3 border-t border-[#2a2a4a] shrink-0">
+                <button onclick="openFabImport()" class="w-full text-sm text-[#4d9eff] bg-transparent border border-[#2a2a4a] rounded-lg py-2.5 cursor-pointer active:bg-[#0d224422]">+ Import file from device</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drop overlay (desktop drag-and-drop) -->
+    <div id="drop-overlay" class="fixed inset-0 z-[9999] bg-[#1a1a2e]/90 items-center justify-center hidden pointer-events-none">
+        <div class="border-2 border-dashed border-[#4d9eff] rounded-2xl p-12 text-center">
+            <svg class="w-16 h-16 mx-auto mb-4 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <div class="text-xl font-semibold text-[#e0e0e0] mb-1">Drop files to import</div>
+            <div class="text-sm text-[#888]">Files will be copied into your sync folder and pushed to the server</div>
+        </div>
+    </div>
 
     <!-- Bottom navigation bar: mobile only -->
     <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-[#16213e] border-t border-[#2a2a4a] flex lg:hidden z-50 pb-[env(safe-area-inset-bottom,0px)]">
@@ -178,7 +216,7 @@
 
         // ---- directory navigation state ----
         var localCurrentPath = '';   // '' = root
-        var serverCurrentPaths = {}; // keyed by device name, '' = root per device
+        var serverCurrentPath = ''; // '' = root
         var cachedClientFiles = [];
         var cachedServerFiles = [];
         var cachedLocalMap = {};
@@ -319,24 +357,6 @@
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        function fileIcon(relPath) {
-            var ext = relPath.split('.').pop().toLowerCase();
-            var icons = {
-                'pdf': '\uD83D\uDCCB',
-                'doc': '\uD83D\uDCDD', 'docx': '\uD83D\uDCDD',
-                'xls': '\uD83D\uDCCA', 'xlsx': '\uD83D\uDCCA',
-                'ppt': '\uD83D\uDCCA', 'pptx': '\uD83D\uDCCA',
-                'jpg': '\uD83D\uDDBC', 'jpeg': '\uD83D\uDDBC',
-                'png': '\uD83D\uDDBC', 'gif': '\uD83D\uDDBC', 'svg': '\uD83D\uDDBC',
-                'mp4': '\uD83C\uDFA5', 'mov': '\uD83C\uDFA5', 'avi': '\uD83C\uDFA5',
-                'mp3': '\uD83C\uDFB5', 'flac': '\uD83C\uDFB5', 'wav': '\uD83C\uDFB5',
-                'zip': '\uD83D\uDCE6', 'tar': '\uD83D\uDCE6', 'gz': '\uD83D\uDCE6',
-                'go': '\uD83D\uDCBB', 'js': '\uD83D\uDCBB', 'ts': '\uD83D\uDCBB',
-                'py': '\uD83D\uDCBB', 'sh': '\uD83D\uDCBB', 'rs': '\uD83D\uDCBB',
-                'txt': '\uD83D\uDCC4', 'md': '\uD83D\uDCC4', 'log': '\uD83D\uDCC4'
-            };
-            return icons[ext] || '\uD83D\uDCC4';
-        }
 
         // ---- directory browsing helpers ----
 
@@ -373,7 +393,7 @@
             if (panel === 'local') {
                 html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'\')">Root</span>';
             } else {
-                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(device) + '\', \'\')">Root</span>';
+                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'\')">Root</span>';
             }
             var accumulated = '';
             for (var i = 0; i < parts.length; i++) {
@@ -383,7 +403,7 @@
                     if (panel === 'local') {
                         html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
                     } else {
-                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(device) + '\', \'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
+                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
                     }
                 } else {
                     html += '<span class="text-[#d0d8f0]">' + escapeHtml(parts[i]) + '</span>';
@@ -398,7 +418,7 @@
             return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors cursor-pointer" onclick="' + onclick + '">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
                     '<span class="shrink-0 w-6 flex justify-center"><svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>' +
-                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">' + escapeHtml(folderName) + '</span>' +
+                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">' + escapeHtml(folderName) + '</span>' +
                 '</div>' +
                 '<div class="flex items-center gap-2">' +
                     '<span class="text-[11px] text-[#666]">' + label + '</span>' +
@@ -413,8 +433,8 @@
             rerenderLocal();
         }
 
-        function navToServer(device, path) {
-            serverCurrentPaths[device] = path;
+        function navToServer(path) {
+            serverCurrentPath = path;
             rerenderServer();
         }
 
@@ -516,8 +536,7 @@
 
             return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
-                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
+                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
                 '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
                     '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
@@ -552,8 +571,7 @@
 
             return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
                 '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-sm shrink-0 w-6 text-center">' + fileIcon(f.rel_path) + '</span>' +
-                    '<span class="font-mono text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
+                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
                 '</div>' +
                 '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
                     '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
@@ -596,53 +614,38 @@
             if (!serverFiles || serverFiles.length === 0) {
                 return emptyStateHtml('server');
             }
-            var groups = groupByDevice(serverFiles);
-            var deviceNames = Object.keys(groups).sort(function(a, b) {
-                if (a === currentDeviceName) return -1;
-                if (b === currentDeviceName) return 1;
-                return a < b ? -1 : a > b ? 1 : 0;
-            });
-            var html = '';
-            deviceNames.forEach(function(device) {
-                var isMine = (device === currentDeviceName);
-                var youBadge = isMine ? ' <span class="text-[#556] normal-case tracking-normal">(you)</span>' : '';
-                var count = groups[device].length;
-                var countBadge = '<span class="ml-auto text-[10px] font-medium text-[#556] normal-case tracking-normal">' + count + ' file' + (count === 1 ? '' : 's') + '</span>';
-                var devicePath = serverCurrentPaths[device] || '';
-                var entries;
-                if (searchQuery) {
-                    var matchingFiles = groups[device].filter(function(f) {
-                        return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
-                    });
-                    entries = { folders: [], files: matchingFiles };
-                } else {
-                    entries = getEntriesAtPath(groups[device], devicePath);
-                }
-                html += '<div class="border-b-2 border-[#2a2a4a]">';
-                html += '<div class="px-4 py-2.5 text-[11px] uppercase tracking-wider text-[#8899bb] font-bold bg-[#1a2444] border-b border-[#2a2a4a] sticky top-0 z-[1] flex items-center gap-2">' + escapeHtml(device) + youBadge + countBadge + '</div>';
-                if (!searchQuery) html += breadcrumbHtml(devicePath, 'server', device);
-                html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
-                if (!searchQuery) {
-                    entries.folders.forEach(function(folderName) {
-                        var folderPath = devicePath + folderName + '/';
-                        var folderCount = folderFileCount(groups[device], folderPath);
-                        html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(device) + "', '" + escapeHtml(folderPath) + "')");
-                    });
-                }
-                entries.files.forEach(function(f) {
-                    var displayName = searchQuery ? f.rel_path : f.rel_path.substring(devicePath.length);
-                    html += renderServerCard(f, localMap, device, isMine, displayName);
+            var entries;
+            if (searchQuery) {
+                var matchingFiles = serverFiles.filter(function(f) {
+                    return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
                 });
-                if (entries.folders.length === 0 && entries.files.length === 0) {
-                    if (searchQuery) {
-                        html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
-                    } else {
-                        html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
-                    }
-                }
-                html += '</div>';
-                html += '</div>';
+                entries = { folders: [], files: matchingFiles };
+            } else {
+                entries = getEntriesAtPath(serverFiles, serverCurrentPath);
+            }
+            var html = '';
+            if (!searchQuery) html += breadcrumbHtml(serverCurrentPath, 'server', '');
+            html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
+            if (!searchQuery) {
+                entries.folders.forEach(function(folderName) {
+                    var folderPath = serverCurrentPath + folderName + '/';
+                    var folderCount = folderFileCount(serverFiles, folderPath);
+                    html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(folderPath) + "')");
+                });
+            }
+            entries.files.forEach(function(f) {
+                var isMine = (f.device_id === currentDeviceName);
+                var displayName = searchQuery ? f.rel_path : f.rel_path.substring(serverCurrentPath.length);
+                html += renderServerCard(f, localMap, f.device_id, isMine, displayName);
             });
+            if (entries.folders.length === 0 && entries.files.length === 0) {
+                if (searchQuery) {
+                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
+                } else {
+                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
+                }
+            }
+            html += '</div>';
             return html;
         }
 
@@ -666,7 +669,7 @@
         async function refreshFileLists() {
             // Reset navigation to root on refresh (after sync/push/pull/delete)
             localCurrentPath = '';
-            serverCurrentPaths = {};
+            serverCurrentPath = '';
             document.getElementById('local-breadcrumb').innerHTML = '';
             document.getElementById('local-file-list').innerHTML = loadingHtml();
             document.getElementById('server-file-list').innerHTML = loadingHtml();
@@ -854,9 +857,30 @@
             }
         }
 
+        // Import one or more files via /api/files/import.
+        // Returns { ok: N, failed: N } counts.
+        async function importFiles(files) {
+            var subdir = localCurrentPath;
+            var baseUrl = '/api/files/import';
+            if (subdir) baseUrl += '?subdir=' + encodeURIComponent(subdir);
+            var ok = 0, failed = 0;
+            for (var i = 0; i < files.length; i++) {
+                var fd = new FormData();
+                fd.append('file', files[i]);
+                try {
+                    var resp = await fetch(baseUrl, { method: 'POST', body: fd });
+                    var data = await resp.json();
+                    if (data.ok) { ok++; } else { failed++; }
+                } catch (e) { failed++; }
+            }
+            await refreshFileLists();
+            await fetchStatus();
+            return { ok: ok, failed: failed };
+        }
+
         async function handleFabFileSelect(input) {
-            var file = input.files[0];
-            if (!file) return;
+            var files = input.files;
+            if (!files.length) return;
             input.value = '';
             var fabBtn = document.getElementById('fab-btn');
             if (operationInFlight) return;
@@ -865,19 +889,11 @@
             fabBtn.textContent = '...';
             setButtonsDisabled(true);
             try {
-                var fd = new FormData();
-                fd.append('file', file);
-                var subdir = localCurrentPath;
-                var url = '/api/files/import';
-                if (subdir) url += '?subdir=' + encodeURIComponent(subdir);
-                var resp = await fetch(url, { method: 'POST', body: fd });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(fabBtn, 'Imported', false);
-                    await refreshFileLists();
-                    await fetchStatus();
+                var result = await importFiles(files);
+                if (result.failed === 0) {
+                    showFeedback(fabBtn, result.ok === 1 ? 'Imported' : result.ok + ' imported', false);
                 } else {
-                    showFeedback(fabBtn, data.message || 'Import failed', true);
+                    showFeedback(fabBtn, result.failed + ' failed', true);
                 }
             } catch (e) {
                 showFeedback(fabBtn, 'Network error', true);
@@ -886,6 +902,63 @@
                 fabBtn.textContent = origText;
                 setButtonsDisabled(false);
             }
+        }
+
+        // ---- drag-and-drop (desktop) ----
+        var dragCounter = 0;
+        var dropOverlay = null;
+
+        function initDragDrop() {
+            dropOverlay = document.getElementById('drop-overlay');
+
+            document.addEventListener('dragenter', function(e) {
+                e.preventDefault();
+                dragCounter++;
+                if (dragCounter === 1) {
+                    dropOverlay.classList.remove('hidden');
+                    dropOverlay.classList.add('flex');
+                    dropOverlay.style.pointerEvents = 'auto';
+                }
+            });
+
+            document.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                dragCounter--;
+                if (dragCounter <= 0) {
+                    dragCounter = 0;
+                    hideDropOverlay();
+                }
+            });
+
+            document.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+
+            document.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dragCounter = 0;
+                hideDropOverlay();
+
+                var files = e.dataTransfer.files;
+                if (!files.length || operationInFlight) return;
+                operationInFlight = true;
+                setButtonsDisabled(true);
+
+                importFiles(files).then(function(result) {
+                    if (result.failed > 0) {
+                        showErrorBanner(result.failed + ' of ' + (result.ok + result.failed) + ' file(s) failed to import');
+                    }
+                }).finally(function() {
+                    operationInFlight = false;
+                    setButtonsDisabled(false);
+                });
+            });
+        }
+
+        function hideDropOverlay() {
+            dropOverlay.classList.add('hidden');
+            dropOverlay.classList.remove('flex');
+            dropOverlay.style.pointerEvents = 'none';
         }
 
         async function doDownload(relPath, btn) {
@@ -1023,6 +1096,67 @@
             }
         }
 
+        // ---- FAB bottom sheet ----
+
+        function buildFabModalList() {
+            var unsyncedFiles = cachedClientFiles.filter(function(f) {
+                var st = computeStatus(cachedLocalMap, cachedServerMap, f.rel_path);
+                return st === 'local-only' || st === 'conflict';
+            });
+            var list = document.getElementById('fab-modal-list');
+            if (unsyncedFiles.length === 0) {
+                list.innerHTML = '<div class="py-8 text-center text-[#556] text-sm">All local files are already synced</div>';
+            } else {
+                list.innerHTML = unsyncedFiles.map(function(f) {
+                    var safe = f.rel_path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    return '<div class="flex items-center gap-3 px-2 py-2.5 rounded-lg active:bg-[#1a1a2e] cursor-pointer" onclick="fabPushFile(this,\'' + safe + '\')">' +
+                        '<span class="text-base shrink-0">' + fileIcon(f.rel_path) + '</span>' +
+                        '<span class="font-mono text-sm text-[#d0d8f0] flex-1 overflow-hidden text-ellipsis whitespace-nowrap">' + escapeHtml(f.rel_path) + '</span>' +
+                        '<span data-fab-status class="text-xs shrink-0 text-[#4d9eff]">Push \u2192</span>' +
+                        '</div>';
+                }).join('');
+            }
+        }
+
+        function openFabModal() {
+            buildFabModalList();
+            document.getElementById('fab-modal').classList.remove('hidden');
+        }
+
+        function closeFabModal() {
+            document.getElementById('fab-modal').classList.add('hidden');
+        }
+
+        function openFabImport() {
+            closeFabModal();
+            document.getElementById('fab-file-input').click();
+        }
+
+        async function fabPushFile(rowEl, relPath) {
+            if (operationInFlight) return;
+            operationInFlight = true;
+            setButtonsDisabled(true);
+            var statusEl = rowEl.querySelector('[data-fab-status]');
+            if (statusEl) statusEl.textContent = '...';
+            try {
+                var resp = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), { method: 'POST' });
+                var data = await resp.json();
+                if (data.ok) {
+                    if (statusEl) { statusEl.textContent = '\u2713'; statusEl.className = 'text-xs shrink-0 text-[#00d26a]'; }
+                    await refreshFileLists();
+                    await fetchStatus();
+                    buildFabModalList();
+                } else {
+                    if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'text-xs shrink-0 text-[#f24c4c]'; }
+                }
+            } catch (err) {
+                if (statusEl) { statusEl.textContent = 'Error'; statusEl.className = 'text-xs shrink-0 text-[#f24c4c]'; }
+            } finally {
+                operationInFlight = false;
+                setButtonsDisabled(false);
+            }
+        }
+
         // ---- polling ----
         // Status polling: lightweight, local HTTP only (no TCP to server)
         // File list refresh: only on load and after operations (avoids TCP spam)
@@ -1035,6 +1169,7 @@
         // Initial load: fetch both status and file lists once
         fetchStatus();
         refreshFileLists();
+        initDragDrop();
         // Only poll status on the timer -- file lists refresh after operations
         setInterval(pollStatus, 5000);
     </script>

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/atienze/HomelabSecureSync/common/crypto"
+	"github.com/atienze/myDrive/common/crypto"
 )
 
 // FileMeta represents a single file discovered during a directory scan,

@@ -16,14 +16,14 @@ type Config struct {
 	DeviceName string `toml:"device_name"`
 }
 
-// ConfigPath returns the absolute path to the config file (~/.vaultsync/config.toml).
+// ConfigPath returns the absolute path to the config file (~/.mydrive/config.toml).
 // Exported so tests and CLI error messages can show the expected location.
 func ConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("could not determine home directory: %w", err)
 	}
-	return filepath.Join(home, ".vaultsync", "config.toml"), nil
+	return filepath.Join(home, ".mydrive", "config.toml"), nil
 }
 
 // StatePath returns the path to state.json, in the same directory as config.toml.
@@ -46,7 +46,7 @@ func Load() (*Config, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, fmt.Errorf(
 			"config file not found at %s\n"+
-				"Run 'vault-sync-server register <device-name>' on your server,\n"+
+				"Run 'mydrive-server register <device-name>' on your server,\n"+
 				"then create %s with the printed token:\n\n"+
 				"  server_addr = \"<server-ip>:9000\"\n"+
 				"  token       = \"<64-char-token>\"\n"+

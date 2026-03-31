@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	stdsync "sync"
 
-	"github.com/atienze/HomelabSecureSync/client/internal/config"
-	"github.com/atienze/HomelabSecureSync/client/internal/scanner"
-	"github.com/atienze/HomelabSecureSync/client/internal/state"
-	"github.com/atienze/HomelabSecureSync/client/internal/status"
-	syncclient "github.com/atienze/HomelabSecureSync/client/internal/sync"
+	"github.com/atienze/myDrive/client/internal/config"
+	"github.com/atienze/myDrive/client/internal/scanner"
+	"github.com/atienze/myDrive/client/internal/state"
+	"github.com/atienze/myDrive/client/internal/status"
+	syncclient "github.com/atienze/myDrive/client/internal/sync"
 )
 
 //go:embed templates/*

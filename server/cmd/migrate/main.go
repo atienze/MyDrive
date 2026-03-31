@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/atienze/HomelabSecureSync/common/crypto"
-	"github.com/atienze/HomelabSecureSync/server/internal/db"
-	"github.com/atienze/HomelabSecureSync/server/internal/store"
+	"github.com/atienze/myDrive/common/crypto"
+	"github.com/atienze/myDrive/server/internal/db"
+	"github.com/atienze/myDrive/server/internal/store"
 )
 
 // Migration path constants define the source and destination directories used
@@ -16,11 +16,11 @@ import (
 const (
 	OldUploadsDir = "./uploads"
 	NewVaultDir   = "./VaultData"
-	DatabasePath  = "./vaultsync.db"
+	DatabasePath  = "./mydrive.db"
 )
 
 func main() {
-	fmt.Println("=== VaultSync Migration: path-based -> content-addressable storage ===")
+	fmt.Println("=== myDrive Migration: path-based -> content-addressable storage ===")
 	fmt.Printf("Source:      %s\n", OldUploadsDir)
 	fmt.Printf("Destination: %s\n", NewVaultDir)
 	fmt.Printf("Database:    %s\n", DatabasePath)

@@ -126,12 +126,12 @@ func RunMigration(dbPath string) error {
 }
 
 func main() {
-	dbPath := os.Getenv("VAULTSYNC_DB_PATH")
+	dbPath := os.Getenv("MYDRIVE_DB_PATH")
 	if dbPath == "" {
-		dbPath = "./vaultsync.db"
+		dbPath = "./mydrive.db"
 	}
 
-	fmt.Printf("=== VaultSync Schema Migration v3: composite UNIQUE constraint ===\n")
+	fmt.Printf("=== myDrive Schema Migration v3: composite UNIQUE constraint ===\n")
 	fmt.Printf("Database: %s\n\n", dbPath)
 
 	conn, err := sql.Open("sqlite", dbPath)
