@@ -1,4 +1,5 @@
-# myDrive &nbsp;·&nbsp; v0.89.0
+# myDrive 
+### v1.2.0
 
 A self-hosted, TCP-based file synchronization tool that streams files between client machines and a homelab server over a Tailscale mesh network. Built entirely in Go with no third-party cloud dependency. Uses SHA-256 content addressing for deduplication, SQLite for file metadata tracking, and a responsive web UI for managing syncs across multiple devices.
 
