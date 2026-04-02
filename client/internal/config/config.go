@@ -51,8 +51,9 @@ func Load() (*Config, error) {
 				"  server_addr = \"<server-ip>:9000\"\n"+
 				"  token       = \"<64-char-token>\"\n"+
 				"  sync_dir    = \"<path-to-sync>\"\n"+
-				"  device_name = \"<device-name>\"",
-			path, path,
+				"  device_name = \"<device-name>\"\n\n"+
+				"Note: restrict config permissions after creation: chmod 600 %s",
+			path, path, path,
 		)
 	}
 
@@ -60,6 +61,13 @@ func Load() (*Config, error) {
 
 	if _, err := toml.DecodeFile(path, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config at %s: %w", path, err)
+	}
+
+	// MYDRIVE_TOKEN env var overrides the token field from config.toml.
+	// Useful for scripting or CI scenarios where writing the token to a file
+	// is undesirable. Does not affect users who set token in config.toml.
+	if envToken := os.Getenv("MYDRIVE_TOKEN"); envToken != "" {
+		cfg.Token = envToken
 	}
 
 	if cfg.ServerAddr == "" {
