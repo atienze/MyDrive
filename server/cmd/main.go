@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"log"
 	"net"
@@ -11,6 +12,20 @@ import (
 	"github.com/atienze/myDrive/server/internal/receiver"
 	"github.com/atienze/myDrive/server/internal/store"
 )
+
+// generateUUIDForRegistration produces a random UUID v4 for device registration.
+// Uses crypto/rand — no external library required.
+func generateUUIDForRegistration() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate UUID: %w", err)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16],
+	), nil
+}
 
 // Port is the TCP address the server listens on.
 const Port = ":9000"
@@ -66,10 +81,17 @@ func runRegister() {
 		log.Fatalf("Failed to generate token: %v", err)
 	}
 
-	// token becomes the device's primary key in the devices table.
-	// Tokens are 256-bit random values — collision probability is negligible.
+	deviceUUID, err := generateUUIDForRegistration()
+	if err != nil {
+		log.Fatalf("Failed to generate device UUID: %v", err)
+	}
+
+	tokenHash := db.ComputeTokenHash(token)
+
+	// UUID is the new primary key; token_hash is the HMAC-SHA256 of the raw token.
+	// The raw token is never stored in the DB.
 	// Registering the same device name twice produces two different tokens, both valid.
-	if err := database.RegisterDevice(token, deviceName); err != nil {
+	if err := database.RegisterDevice(deviceUUID, tokenHash, deviceName); err != nil {
 		log.Fatalf("Failed to register device: %v", err)
 	}
 
