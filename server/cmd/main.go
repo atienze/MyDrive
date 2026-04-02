@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"log"
 	"net"
@@ -12,20 +11,6 @@ import (
 	"github.com/atienze/myDrive/server/internal/receiver"
 	"github.com/atienze/myDrive/server/internal/store"
 )
-
-// generateUUIDForRegistration produces a random UUID v4 for device registration.
-// Uses crypto/rand — no external library required.
-func generateUUIDForRegistration() (string, error) {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generate UUID: %w", err)
-	}
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16],
-	), nil
-}
 
 // Port is the TCP address the server listens on.
 const Port = ":9000"
@@ -81,7 +66,7 @@ func runRegister() {
 		log.Fatalf("Failed to generate token: %v", err)
 	}
 
-	deviceUUID, err := generateUUIDForRegistration()
+	deviceUUID, err := auth.GenerateUUID()
 	if err != nil {
 		log.Fatalf("Failed to generate device UUID: %v", err)
 	}
