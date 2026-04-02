@@ -2,6 +2,7 @@ package receiver
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
@@ -42,10 +43,13 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		return
 	}
 
-	// --- Phase 2 Auth: validate token against the devices table ---
-	// If the token is not registered, close the connection immediately.
-	// We do not reveal whether the token exists or why it was rejected.
-	deviceName, ok, err := database.GetDeviceName(shake.Token)
+	// --- Auth: hash the inbound token and look up by HMAC digest ---
+	// Raw token is discarded after this point — never stored or logged.
+	mac := hmac.New(sha256.New, []byte("mydrive-v1"))
+	mac.Write([]byte(shake.Token))
+	tokenHash := hex.EncodeToString(mac.Sum(nil))
+
+	deviceUUID, deviceName, ok, err := database.GetDeviceByTokenHash(tokenHash)
 	if err != nil {
 		log.Printf("Auth DB error for connection %s: %v", conn.RemoteAddr(), err)
 		return
@@ -97,7 +101,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				continue
 			}
 
-			exists, err := database.FileExists(req.RelPath, req.Hash, deviceName)
+			exists, err := database.FileExists(req.RelPath, req.Hash, deviceUUID)
 			if err != nil {
 				// If the DB check fails, tell client we need the file.
 				// Better to receive a duplicate than to silently lose data.
@@ -185,7 +189,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 					currentHash = ""
 					continue
 				}
-				if err := database.UpsertFile(currentPath, currentHash, deviceName, 0); err != nil {
+				if err := database.UpsertFile(currentPath, currentHash, deviceUUID, 0); err != nil {
 					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
 				} else {
 					log.Printf("Stored empty file: %s -> %s", currentPath, currentHash[:12])
@@ -253,7 +257,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				log.Printf("Stored object: %s -> %s", currentPath, currentHash[:12])
 
 				// Record the path->hash mapping in the database.
-				err = database.UpsertFile(currentPath, currentHash, deviceName, currentFileReceived)
+				err = database.UpsertFile(currentPath, currentHash, deviceUUID, currentFileReceived)
 				if err != nil {
 					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
 				} else {
@@ -282,7 +286,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			}
 
 			// Get the hash before marking deleted (needed for blob cleanup).
-			fileHash, exists, err := database.GetFileHash(req.RelPath, deviceName)
+			fileHash, exists, err := database.GetFileHash(req.RelPath, deviceUUID)
 			if err != nil {
 				log.Printf("DB error looking up %s for deletion: %v", req.RelPath, err)
 				sendDeleteResponse(networkEncoder, false, "server error")
@@ -294,7 +298,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 				continue
 			}
 
-			if err := database.MarkDeleted(req.RelPath, deviceName); err != nil {
+			if err := database.MarkDeleted(req.RelPath, deviceUUID); err != nil {
 				log.Printf("Failed to mark %s as deleted: %v", req.RelPath, err)
 				sendDeleteResponse(networkEncoder, false, "server error")
 				continue
@@ -314,7 +318,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 			// Runs unconditionally — even when the blob is still referenced by other
 			// devices under different paths, THIS device's row should be removed.
 			// The AND deleted=TRUE guard in PurgeDeletedRecord ensures safety.
-			if err := database.PurgeDeletedRecord(req.RelPath, deviceName); err != nil {
+			if err := database.PurgeDeletedRecord(req.RelPath, deviceUUID); err != nil {
 				log.Printf("Warning: failed to purge deleted record %s: %v", req.RelPath, err)
 			}
 
@@ -335,11 +339,15 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 
 			entries := make([]protocol.ServerFileEntry, len(files))
 			for i, f := range files {
+				name := f.DeviceID // fallback to UUID if lookup fails
+				if n, found, err := database.GetDeviceName(f.DeviceID); err == nil && found {
+					name = n
+				}
 				entries[i] = protocol.ServerFileEntry{
 					RelPath:  f.RelPath,
 					Hash:     f.Hash,
 					Size:     f.Size,
-					DeviceID: f.DeviceID,
+					DeviceID: name,
 				}
 			}
 
