@@ -22,6 +22,10 @@ import (
 	"github.com/atienze/myDrive/common/protocol"
 )
 
+// syncDialTimeout is the TCP connection timeout for sync cycle dials.
+// Matches the timeout used by DialAndHandshake in the operations package.
+const syncDialTimeout = 10 * time.Second
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "Usage: mydrive <sync|daemon|pull>")
@@ -193,7 +197,7 @@ func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath s
 	fmt.Printf("Server:   %s\n", cfg.ServerAddr)
 
 	// Connect to the server.
-	conn, err := net.Dial("tcp", cfg.ServerAddr)
+	conn, err := net.DialTimeout("tcp", cfg.ServerAddr, syncDialTimeout)
 	if err != nil {
 		return 0, 0, fmt.Errorf("connect to server: %w", err)
 	}
@@ -241,7 +245,7 @@ func runSyncCycle(cfg *config.Config) (int, error) {
 	}
 
 	// Connect to the server.
-	conn, err := net.Dial("tcp", cfg.ServerAddr)
+	conn, err := net.DialTimeout("tcp", cfg.ServerAddr, syncDialTimeout)
 	if err != nil {
 		return 0, fmt.Errorf("connect to server: %w", err)
 	}
