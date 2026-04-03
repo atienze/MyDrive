@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -163,13 +162,19 @@ func VerifyHash(path string) (string, error) {
 }
 
 // ValidateRelPath checks that a relative path is safe to store in the DB.
-// Rejects absolute paths and paths containing "..".
+// Uses filepath.Clean for OS-native normalization — correctly handles "..",
+// ".", double slashes, and Windows-style backslash separators on all platforms.
+// Returns false for absolute paths, traversal attempts, ".", and empty paths.
 func ValidateRelPath(relPath string) bool {
 	if filepath.IsAbs(relPath) {
 		return false
 	}
-	if strings.Contains(relPath, "..") {
+	cleaned := filepath.Clean(relPath)
+	// Reject "." (empty or single-dot), ".." (one level up), and any path
+	// starting with "../" (traversal into a sibling). filepath.Clean normalizes
+	// Windows-style "..\" so this check works on all platforms.
+	if cleaned == "." || cleaned == ".." || (len(cleaned) >= 3 && cleaned[:3] == "../") {
 		return false
 	}
-	return relPath != ""
+	return true
 }
