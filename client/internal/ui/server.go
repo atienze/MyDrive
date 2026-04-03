@@ -23,6 +23,11 @@ import (
 //go:embed templates/*
 var templateFS embed.FS
 
+// maxImportBytes is the hard cap on the total HTTP body size for /api/files/import.
+// Files larger than this are rejected before any data is written to disk.
+// 512 MiB is generous for a homelab but prevents accidental runaway imports.
+const maxImportBytes = 512 << 20 // 512 MiB
+
 // fileListResponse is the JSON envelope returned by the file-list endpoints.
 type fileListResponse struct {
 	Files []fileEntry `json:"files"`
@@ -253,7 +258,14 @@ func (u *UIServer) handleUpload(w http.ResponseWriter, r *http.Request) {
 // handleImport copies an uploaded file into sync_dir then pushes it to the server.
 // POST /api/files/import?subdir=<optional rel subdir> — acquires syncMu.
 func (u *UIServer) handleImport(w http.ResponseWriter, r *http.Request) {
+	// Cap total body before ParseMultipartForm so partial data is never written.
+	r.Body = http.MaxBytesReader(w, r.Body, maxImportBytes)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, "file exceeds import size limit (512 MiB)")
+			return
+		}
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("parse form: %v", err))
 		return
 	}
