@@ -100,7 +100,8 @@ func (s *Syncer) downloadPhase() (int, error) {
 		seen[f.RelPath] = true
 
 		fullPath := filepath.Join(s.syncDir, f.RelPath)
-		localHash, tracked := s.state.Files[f.RelPath]
+		localHash := s.state.GetHash(f.RelPath)
+		tracked := localHash != ""
 
 		// Skip if local file exists with a matching hash.
 		if tracked && localHash == f.Hash {
@@ -133,7 +134,7 @@ func (s *Syncer) uploadPhase() (int, error) {
 	for _, f := range files {
 		currentFiles[f.Path] = true
 	}
-	for relPath := range s.state.Files {
+	for _, relPath := range s.state.Keys() {
 		if !currentFiles[relPath] {
 			fmt.Printf("Local deletion detected (removed from tracking): %s\n", relPath)
 			// Only remove from local state — do NOT send CmdDeleteFile to server.
@@ -214,6 +215,13 @@ func cleanEmptyDirs(dir, stopAt string) {
 			return
 		}
 		os.Remove(dir)
-		dir = filepath.Dir(dir)
+		next := filepath.Dir(dir)
+		if next == dir {
+			// Reached filesystem root without finding stopAt — stopAt was unreachable.
+			// Break to avoid an infinite loop at the root.
+			log.Printf("cleanEmptyDirs: cycle guard triggered at %q (stopAt=%q)", dir, stopAt)
+			return
+		}
+		dir = next
 	}
 }
