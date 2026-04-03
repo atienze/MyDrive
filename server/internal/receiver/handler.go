@@ -17,6 +17,29 @@ import (
 	"github.com/atienze/myDrive/server/internal/store"
 )
 
+// fileTransfer holds in-progress state for a single file being received.
+// Call reset() at the start of each CmdSendFile to atomically clean up any
+// previous incomplete transfer and zero all fields.
+type fileTransfer struct {
+	file     *os.File
+	hasher   hash.Hash
+	size     int64
+	received int64
+	path     string
+	hash     string
+}
+
+// reset closes and removes any in-progress temp file, then zeroes all fields.
+// Safe to call on a zero-value fileTransfer (guards the nil-file case).
+func (ft *fileTransfer) reset() {
+	if ft.file != nil {
+		tmpPath := ft.file.Name()
+		ft.file.Close()
+		os.Remove(tmpPath)
+	}
+	*ft = fileTransfer{}
+}
+
 // HandleConnection validates the device token, then processes file sync commands.
 // conn is closed on return via defer — including on auth failure.
 func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectStore) {
@@ -61,20 +84,15 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 	log.Printf("Authenticated device: %s (from %s)", deviceName, conn.RemoteAddr())
 
 	// --- State variables for in-progress file transfers ---
-	var currentFile *os.File      // temp file receiving chunks
-	var currentHasher hash.Hash   // streaming SHA-256 computed as chunks arrive
-	var currentFileSize int64     // declared total size
-	var currentFileReceived int64 // bytes received so far
-	var currentPath string        // client-side relative path (DB key only)
-	var currentHash string        // declared hash from the client
+	var ft fileTransfer
 
 	for {
 		var p protocol.Packet
 		err := rawDecoder.Decode(&p)
 		if err != nil {
-			if currentFile != nil {
-				tmpPath := currentFile.Name()
-				currentFile.Close()
+			if ft.file != nil {
+				tmpPath := ft.file.Name()
+				ft.file.Close()
 				os.Remove(tmpPath) // clean up incomplete transfer
 			}
 			log.Printf("Connection closed from %s (%s): %v", deviceName, conn.RemoteAddr(), err)
@@ -137,67 +155,63 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		// streaming hash.
 		// -------------------------------------------------------
 		case protocol.CmdSendFile:
-			if currentFile != nil {
-				tmpPath := currentFile.Name()
-				currentFile.Close()
-				os.Remove(tmpPath) // clean up previous incomplete transfer
-			}
+			ft.reset() // atomically clean up any previous incomplete transfer
 
-			var ft protocol.FileTransfer
-			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&ft)
+			var meta protocol.FileTransfer
+			gob.NewDecoder(bytes.NewBuffer(p.Payload)).Decode(&meta)
 
 			// Validate the relative path.
-			if !store.ValidateRelPath(ft.RelPath) {
-				log.Printf("Rejected invalid path in CmdSendFile from %s: %q", deviceName, ft.RelPath)
+			if !store.ValidateRelPath(meta.RelPath) {
+				log.Printf("Rejected invalid path in CmdSendFile from %s: %q", deviceName, meta.RelPath)
 				continue
 			}
 
 			tmpFile, err := objectStore.CreateTempFile()
 			if err != nil {
-				log.Printf("Failed to create temp file for %s: %v", ft.RelPath, err)
+				log.Printf("Failed to create temp file for %s: %v", meta.RelPath, err)
 				continue
 			}
 
-			currentFile = tmpFile
-			currentHasher = sha256.New()
-			currentFileSize = ft.Size
-			currentFileReceived = 0
-			currentPath = ft.RelPath
-			currentHash = ft.Hash
+			ft.file = tmpFile
+			ft.hasher = sha256.New()
+			ft.size = meta.Size
+			ft.received = 0
+			ft.path = meta.RelPath
+			ft.hash = meta.Hash
 
-			log.Printf("Receiving: %s (%d bytes)", ft.RelPath, ft.Size)
+			log.Printf("Receiving: %s (%d bytes)", meta.RelPath, meta.Size)
 
 			// Zero-byte files send no CmdFileChunk — finalize immediately.
-			if ft.Size == 0 {
-				tmpPath := currentFile.Name()
-				currentFile.Close()
-				currentFile = nil
+			if meta.Size == 0 {
+				tmpPath := ft.file.Name()
+				ft.file.Close()
+				ft.file = nil
 
-				computedHash := hex.EncodeToString(currentHasher.Sum(nil))
-				if computedHash != currentHash {
+				computedHash := hex.EncodeToString(ft.hasher.Sum(nil))
+				if computedHash != ft.hash {
 					log.Printf("Hash mismatch for empty file %s: expected %s, got %s",
-						currentPath, currentHash[:12], computedHash[:12])
+						ft.path, ft.hash[:12], computedHash[:12])
 					os.Remove(tmpPath)
-					currentPath = ""
-					currentHash = ""
+					ft.path = ""
+					ft.hash = ""
 					continue
 				}
 
-				if err := objectStore.StoreFromTemp(currentHash, tmpPath); err != nil {
-					log.Printf("Failed to store empty object for %s: %v", currentPath, err)
-					currentPath = ""
-					currentHash = ""
+				if err := objectStore.StoreFromTemp(ft.hash, tmpPath); err != nil {
+					log.Printf("Failed to store empty object for %s: %v", ft.path, err)
+					ft.path = ""
+					ft.hash = ""
 					continue
 				}
-				if err := database.UpsertFile(currentPath, currentHash, deviceUUID, 0); err != nil {
-					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
+				if err := database.UpsertFile(ft.path, ft.hash, deviceUUID, 0); err != nil {
+					log.Printf("Warning: failed to record %s in database: %v", ft.path, err)
 				} else {
-					log.Printf("Stored empty file: %s -> %s", currentPath, currentHash[:12])
+					log.Printf("Stored empty file: %s -> %s", ft.path, ft.hash[:12])
 				}
-				currentPath = ""
-				currentHash = ""
-				currentFileSize = 0
-				currentFileReceived = 0
+				ft.path = ""
+				ft.hash = ""
+				ft.size = 0
+				ft.received = 0
 			}
 
 		// -------------------------------------------------------
@@ -206,68 +220,68 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 		// On completion: verifies hash, stores object, upserts DB.
 		// -------------------------------------------------------
 		case protocol.CmdFileChunk:
-			if currentFile == nil {
+			if ft.file == nil {
 				continue
 			}
 
 			// Write to both the temp file and the running hash simultaneously.
-			writer := io.MultiWriter(currentFile, currentHasher)
+			writer := io.MultiWriter(ft.file, ft.hasher)
 			n, err := writer.Write(p.Payload)
 			if err != nil {
-				log.Printf("Write error for %s: %v", currentPath, err)
-				tmpPath := currentFile.Name()
-				currentFile.Close()
+				log.Printf("Write error for %s: %v", ft.path, err)
+				tmpPath := ft.file.Name()
+				ft.file.Close()
 				os.Remove(tmpPath)
-				currentFile = nil
+				ft.file = nil
 				continue
 			}
 
-			currentFileReceived += int64(n)
+			ft.received += int64(n)
 
-			if currentFileReceived >= currentFileSize {
-				tmpPath := currentFile.Name()
-				currentFile.Close()
-				currentFile = nil
+			if ft.received >= ft.size {
+				tmpPath := ft.file.Name()
+				ft.file.Close()
+				ft.file = nil
 
 				// Verify the hash matches what the client declared.
-				computedHash := hex.EncodeToString(currentHasher.Sum(nil))
-				if computedHash != currentHash {
+				computedHash := hex.EncodeToString(ft.hasher.Sum(nil))
+				if computedHash != ft.hash {
 					log.Printf("Hash mismatch for %s: expected %s, got %s",
-						currentPath, currentHash[:12], computedHash[:12])
+						ft.path, ft.hash[:12], computedHash[:12])
 					os.Remove(tmpPath)
-					currentPath = ""
-					currentHash = ""
-					currentFileSize = 0
-					currentFileReceived = 0
+					ft.path = ""
+					ft.hash = ""
+					ft.size = 0
+					ft.received = 0
 					continue
 				}
 
 				// Move the temp file to content-addressed storage.
 				// StoreFromTemp handles dedup — if the blob already exists, the temp file is removed.
-				err := objectStore.StoreFromTemp(currentHash, tmpPath)
+				err := objectStore.StoreFromTemp(ft.hash, tmpPath)
 				if err != nil {
-					log.Printf("Failed to store object for %s: %v", currentPath, err)
-					currentPath = ""
-					currentHash = ""
-					currentFileSize = 0
-					currentFileReceived = 0
+					log.Printf("Failed to store object for %s: %v", ft.path, err)
+					ft.path = ""
+					ft.hash = ""
+					ft.size = 0
+					ft.received = 0
 					continue
 				}
 
-				log.Printf("Stored object: %s -> %s", currentPath, currentHash[:12])
+				log.Printf("Stored object: %s -> %s", ft.path, ft.hash[:12])
 
 				// Record the path->hash mapping in the database.
-				err = database.UpsertFile(currentPath, currentHash, deviceUUID, currentFileReceived)
+				err = database.UpsertFile(ft.path, ft.hash, deviceUUID, ft.received)
 				if err != nil {
-					log.Printf("Warning: failed to record %s in database: %v", currentPath, err)
+					log.Printf("Warning: failed to record %s in database: %v", ft.path, err)
 				} else {
-					log.Printf("Recorded in database: %s", currentPath)
+					log.Printf("Recorded in database: %s", ft.path)
 				}
 
-				currentPath = ""
-				currentHash = ""
-				currentFileSize = 0
-				currentFileReceived = 0
+				ft.path = ""
+				ft.hash = ""
+				ft.size = 0
+				ft.received = 0
 			}
 
 		// -------------------------------------------------------
