@@ -178,9 +178,10 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 // updateStorageStats computes file count + total size from the shared state.
 // Uses the passed *LocalState directly — no disk reload.
 func updateStorageStats(cfg *config.Config, appStatus *status.Status, st *state.LocalState) {
-	totalFiles := len(st.Files)
+	keys := st.Keys()
+	totalFiles := len(keys)
 	var totalSize int64
-	for relPath := range st.Files {
+	for _, relPath := range keys {
 		fullPath := filepath.Join(cfg.SyncDir, relPath)
 		if info, err := os.Stat(fullPath); err == nil {
 			totalSize += info.Size()
