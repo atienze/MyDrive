@@ -78,7 +78,7 @@ func (s *Syncer) downloadPhase() (int, error) {
 	// Pass 1: collect all paths this device owns on the server.
 	ownedPaths := make(map[string]bool)
 	for _, f := range serverFiles {
-		if f.DeviceID == s.cfg.Token {
+		if f.DeviceID == s.cfg.DeviceName {
 			ownedPaths[f.RelPath] = true
 		}
 	}
@@ -87,7 +87,7 @@ func (s *Syncer) downloadPhase() (int, error) {
 	downloaded := 0
 	for _, f := range serverFiles {
 		// Skip cross-device entries for paths this device already owns.
-		if f.DeviceID != s.cfg.Token && ownedPaths[f.RelPath] {
+		if f.DeviceID != s.cfg.DeviceName && ownedPaths[f.RelPath] {
 			log.Printf("Skipping %s from device %s (own device entry takes priority)", f.RelPath, f.DeviceID[:8])
 			continue
 		}
