@@ -79,6 +79,9 @@ func Load() (*Config, error) {
 	if cfg.SyncDir == "" {
 		return nil, fmt.Errorf("config: sync_dir is required")
 	}
+	if cfg.DeviceName == "" {
+		return nil, fmt.Errorf("config: device_name is required")
+	}
 
 	return &cfg, nil
 }

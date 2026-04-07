@@ -162,7 +162,7 @@ func doSyncCycle(cfg *config.Config, appStatus *status.Status, st *state.LocalSt
 	uploaded, downloaded, err := runSyncCycleWithState(cfg, st, statePath)
 
 	appStatus.SetSyncing(false)
-	appStatus.SetLastSync(uploaded, err)
+	appStatus.SetLastSync(uploaded, downloaded, err)
 
 	if err != nil {
 		appStatus.SetConnected(false)
