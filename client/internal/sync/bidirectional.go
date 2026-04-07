@@ -88,7 +88,7 @@ func (s *Syncer) downloadPhase() (int, error) {
 	for _, f := range serverFiles {
 		// Skip cross-device entries for paths this device already owns.
 		if f.DeviceID != s.cfg.DeviceName && ownedPaths[f.RelPath] {
-			log.Printf("Skipping %s from device %s (own device entry takes priority)", f.RelPath, f.DeviceID[:8])
+			log.Printf("Skipping %s from device %s (own device entry takes priority)", f.RelPath, f.DeviceID[:min(8, len(f.DeviceID))])
 			continue
 		}
 

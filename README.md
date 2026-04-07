@@ -5,14 +5,35 @@ A self-hosted, TCP-based file synchronization tool that streams files between cl
 
 ## Features
 
-- **Content-addressable storage** — identical files stored once regardless of path; blobs removed only when all references are deleted
-- **Multi-device sync** — per-device file namespacing with cross-device pull; any registered device can pull files from another; own-device entries always take priority over another device's copy of the same path during download
-- **Custom binary protocol** — 11-command TCP protocol with magic-number handshake, token auth, and 4MB chunked file transfer
-- **Responsive web UI** — full file browser at `localhost:9876` with desktop sidebar and mobile bottom nav; real-time recursive search, drag-and-drop import, FAB push sheet on mobile
-- **Conflict resolution** — client-wins strategy; if hashes differ, client re-uploads its version
-- **Deletion safety** — server acts as persistent store; local deletions do not cascade to server without explicit UI action
-- **Tailscale mesh networking** — all TCP traffic routes through Tailscale's encrypted overlay network; `server_addr` in config points to a Tailscale IP, giving every device zero-config secure connectivity with no open ports or VPN setup
-- **Cross-platform** — builds for Linux (amd64), Windows (amd64), and iOS via iSH (linux/386)
+- Content-addressable blob storage with SHA-256 deduplication
+- Multi-device sync with server
+- Responsive web UI with file browser, search, and drag-and-drop import
+- Tailscale mesh networking — no open ports required
+- Cross-platform: Linux, Windows, iOS (iSH)
+
+## Setup
+
+Prerequisites
+- Go v1.25+ 
+- Repo cloned on client machine
+- Homelab server reachable on port 9000
+
+Process: (ORDER MATTERS)
+
+server
+- Build server binary and put on server machine
+- Set optional configs on server machine
+  - config details further down in README
+- Make file executable
+- Register client devices. (token only prints once)
+  - ./mydrive-server register "DeviceName" -> copy output, will need in client config
+- Run server
+
+client
+- Build client binary and put on client machine
+- Create ~/.mydrive/config.toml and setup client config with token in server steps above
+  - config details further down in README
+- run file daemon and sync files to and from server 
 
 ## Build & Run
 
@@ -20,9 +41,13 @@ This is a Go workspace project (go 1.25.6). Always run builds from the repo root
 
 ```bash
 # Build
+
+## COMPILED SERVER BINARY
 #ubuntu linux
 GOOS=linux GOARCH=amd64 go build -o mydrive-server ./server/cmd
 
+
+## COMPILED CLIENT BINARY
 #windows
 GOOS=windows GOARCH=amd64 go build -o mydrive.exe ./client/cmd
 
@@ -131,16 +156,33 @@ sync_dir    = "~/VaultDrive"
 device_name = "MyLaptop"
 ```
 
-`MYDRIVE_TOKEN` environment variable overrides the `token` field from `config.toml` when non-empty. Useful for scripting or CI scenarios.
+For normal homelab use, `config.toml` is all you need. 
 
-**Client state**: `~/.mydrive/state.json` — tracks `relPath → hash` for deletion detection.
+The `MYDRIVE_TOKEN` environment variable is
+  - optional client side override
+  - it replaces the `token` field at runtime without modifying the file. 
+  - Useful when running `mydrive sync` in scripts or CI environments where writing the token to disk is undesirable.
 
 **Server config** (environment variables):
 
 | Variable | Default | Purpose |
-|---|---|---|
 | `MYDRIVE_DB_PATH` | `./mydrive.db` | SQLite database path |
 | `MYDRIVE_DATA_DIR` | `./VaultData` | Object store root |
+
+Set these before starting the server. Default is automatically applied if no env vars detected. For a one-off run:
+
+```bash
+MYDRIVE_DB_PATH=/data/mydrive.db MYDRIVE_DATA_DIR=/data/VaultData ./mydrive-server
+```
+
+For a persistent systemd service, add them under `[Service]` in your systems service file:
+
+```.service
+[Service]
+Environment=MYDRIVE_DB_PATH=/data/mydrive.db
+Environment=MYDRIVE_DATA_DIR=/data/VaultData
+ExecStart=/usr/local/bin/mydrive-server
+```
 
 Server listens on `:9000`. Web UI listens on `127.0.0.1:9876`.
 
