@@ -2,7 +2,6 @@ package receiver
 
 import (
 	"bytes"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
@@ -68,9 +67,7 @@ func HandleConnection(conn net.Conn, database *db.DB, objectStore *store.ObjectS
 
 	// --- Auth: hash the inbound token and look up by HMAC digest ---
 	// Raw token is discarded after this point — never stored or logged.
-	mac := hmac.New(sha256.New, []byte("mydrive-v1"))
-	mac.Write([]byte(shake.Token))
-	tokenHash := hex.EncodeToString(mac.Sum(nil))
+	tokenHash := db.ComputeTokenHash(shake.Token)
 
 	deviceUUID, deviceName, ok, err := database.GetDeviceByTokenHash(tokenHash)
 	if err != nil {

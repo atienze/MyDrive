@@ -452,58 +452,6 @@ func (db *DB) PurgeDeletedRecord(relPath, deviceID string) error {
 	return nil
 }
 
-// GetFilesForDevice returns all non-deleted files owned by the given device.
-func (db *DB) GetFilesForDevice(deviceID string) ([]FileRecord, error) {
-	query := `
-    SELECT id, rel_path, hash, size, device_id, uploaded_at
-    FROM files
-    WHERE device_id = ? AND deleted = FALSE
-    ORDER BY rel_path
-    `
-	rows, err := db.conn.Query(query, deviceID)
-	if err != nil {
-		return nil, fmt.Errorf("get files for device %s: %w", deviceID, err)
-	}
-	defer rows.Close()
-
-	var files []FileRecord
-	for rows.Next() {
-		var f FileRecord
-		err := rows.Scan(&f.ID, &f.RelPath, &f.Hash, &f.Size, &f.DeviceID, &f.UploadedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan file row: %w", err)
-		}
-		files = append(files, f)
-	}
-	return files, rows.Err()
-}
-
-// GetSharedFiles returns all non-deleted files from devices other than the given one.
-func (db *DB) GetSharedFiles(excludeDeviceID string) ([]FileRecord, error) {
-	query := `
-    SELECT id, rel_path, hash, size, device_id, uploaded_at
-    FROM files
-    WHERE device_id != ? AND deleted = FALSE
-    ORDER BY rel_path
-    `
-	rows, err := db.conn.Query(query, excludeDeviceID)
-	if err != nil {
-		return nil, fmt.Errorf("get shared files excluding %s: %w", excludeDeviceID, err)
-	}
-	defer rows.Close()
-
-	var files []FileRecord
-	for rows.Next() {
-		var f FileRecord
-		err := rows.Scan(&f.ID, &f.RelPath, &f.Hash, &f.Size, &f.DeviceID, &f.UploadedAt)
-		if err != nil {
-			return nil, fmt.Errorf("scan file row: %w", err)
-		}
-		files = append(files, f)
-	}
-	return files, rows.Err()
-}
-
 // RegisterDevice creates a new device record with the given UUID as its primary key,
 // token_hash as the HMAC-SHA256 of the raw token, and name as the human-readable label.
 // The caller (server/cmd/main.go) is responsible for generating the UUID and computing

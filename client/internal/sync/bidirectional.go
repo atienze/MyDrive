@@ -1,7 +1,6 @@
 package sync
 
 import (
-	"bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
@@ -174,54 +173,3 @@ func (s *Syncer) uploadPhase() (int, error) {
 	return uploaded, nil
 }
 
-// sendDeleteFile tells the server to soft-delete a file.
-func (s *Syncer) sendDeleteFile(relPath string) error {
-	req := protocol.DeleteFileRequest{RelPath: relPath}
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(req); err != nil {
-		return err
-	}
-
-	if err := s.encoder.Encode(protocol.Packet{
-		Cmd:     protocol.CmdDeleteFile,
-		Payload: buf.Bytes(),
-	}); err != nil {
-		return err
-	}
-
-	// Read the server's response.
-	var respPacket protocol.Packet
-	if err := s.decoder.Decode(&respPacket); err != nil {
-		return fmt.Errorf("read delete response: %w", err)
-	}
-
-	var resp protocol.DeleteFileResponse
-	if err := gob.NewDecoder(bytes.NewBuffer(respPacket.Payload)).Decode(&resp); err != nil {
-		return fmt.Errorf("decode delete response: %w", err)
-	}
-
-	if !resp.Success {
-		return fmt.Errorf("server rejected delete: %s", resp.Message)
-	}
-	return nil
-}
-
-// cleanEmptyDirs removes empty directories walking up from dir toward stopAt.
-// Stops when it reaches stopAt or encounters a non-empty directory.
-func cleanEmptyDirs(dir, stopAt string) {
-	for dir != stopAt {
-		entries, err := os.ReadDir(dir)
-		if err != nil || len(entries) > 0 {
-			return
-		}
-		os.Remove(dir)
-		next := filepath.Dir(dir)
-		if next == dir {
-			// Reached filesystem root without finding stopAt — stopAt was unreachable.
-			// Break to avoid an infinite loop at the root.
-			log.Printf("cleanEmptyDirs: cycle guard triggered at %q (stopAt=%q)", dir, stopAt)
-			return
-		}
-		dir = next
-	}
-}
