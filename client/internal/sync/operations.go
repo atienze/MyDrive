@@ -32,9 +32,9 @@ const (
 	// 10s catches server-unreachable / DNS failures promptly.
 	dialTimeout = 10 * time.Second
 
-	// opDeadline is the per-operation wall-clock deadline set after handshake.
+	// OpDeadline is the per-operation wall-clock deadline set after handshake.
 	// 5 minutes is generous for large file transfers on a homelab LAN.
-	opDeadline = 5 * time.Minute
+	OpDeadline = 5 * time.Minute
 )
 
 // DialAndHandshake opens a TCP connection to cfg.ServerAddr and performs the
@@ -77,7 +77,7 @@ func FetchServerFileList(cfg *config.Config) ([]protocol.ServerFileEntry, error)
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(OpDeadline)); err != nil {
 		return nil, fmt.Errorf("set deadline: %w", err)
 	}
 
@@ -121,7 +121,7 @@ func UploadSingleFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(OpDeadline)); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
 
@@ -182,7 +182,7 @@ func DownloadSingleFile(cfg *config.Config, st *state.LocalState, statePath, rel
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(OpDeadline)); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
 
@@ -288,7 +288,7 @@ func DeleteServerFile(cfg *config.Config, st *state.LocalState, statePath, relPa
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(OpDeadline)); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
 
@@ -355,7 +355,7 @@ func PullFile(cfg *config.Config, st *state.LocalState, statePath, fromDevice, r
 	}
 	defer conn.Close()
 
-	if err := conn.SetDeadline(time.Now().Add(opDeadline)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(OpDeadline)); err != nil {
 		return fmt.Errorf("set deadline: %w", err)
 	}
 

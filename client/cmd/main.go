@@ -217,6 +217,10 @@ func runSyncCycleWithState(cfg *config.Config, st *state.LocalState, statePath s
 		return 0, 0, fmt.Errorf("handshake: %w", err)
 	}
 
+	if err := conn.SetDeadline(time.Now().Add(bisync.OpDeadline)); err != nil {
+		return 0, 0, fmt.Errorf("set operation deadline: %w", err)
+	}
+
 	// Run the bidirectional sync using the shared state.
 	start := time.Now()
 	syncer := bisync.NewSyncer(encoder, decoder, cfg.SyncDir, statePath, st, cfg)
@@ -263,6 +267,10 @@ func runSyncCycle(cfg *config.Config) (int, error) {
 	}
 	if err := encoder.Encode(shake); err != nil {
 		return 0, fmt.Errorf("handshake: %w", err)
+	}
+
+	if err := conn.SetDeadline(time.Now().Add(bisync.OpDeadline)); err != nil {
+		return 0, fmt.Errorf("set operation deadline: %w", err)
 	}
 
 	// Run the bidirectional sync.
