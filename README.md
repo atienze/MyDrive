@@ -75,6 +75,8 @@ Binary encoding via Go's `gob`. Every connection starts with a handshake:
 - Version: 3
 - Token: 64-char hex auth token
 
+The server authenticates each connection by computing `HMAC-SHA256(key="mydrive-v1", data=token)` and looking up the resulting hash in `devices.token_hash`.
+
 Commands (1–11): Ping, SendFile, CheckFile, FileStatus, FileChunk, DeleteFile, ListServerFiles, ServerFileList, RequestFile, FileDataHeader, FileDataChunk.
 
 `RequestFile` with an empty `Hash` field tells the server to resolve the blob hash from its DB — used for cross-device pull where the requester doesn't know the hash.
@@ -83,16 +85,16 @@ Commands (1–11): Ping, SendFile, CheckFile, FileStatus, FileChunk, DeleteFile,
 
 Pure-Go SQLite via `modernc.org/sqlite`. Two tables:
 - `files` — `id`, `rel_path`, `hash`, `size`, `device_id` (FK), `uploaded_at`, `deleted` (soft-delete). Composite unique index on `(rel_path, device_id)`.
-- `devices` — `id` (token, PK), `name`, `created_at`
+- `devices` — `id` (UUID v4, PK), `token_hash` (HMAC-SHA256 of raw token, unique), `name`, `created_at`
 
-`SetMaxOpenConns(1)` prevents SQLite write-lock contention. Auto-migration creates the composite unique index if missing from pre-existing DBs.
+`SetMaxOpenConns(1)` prevents SQLite write-lock contention. Auto-migration runs two upgrades on pre-existing databases: (1) creates the composite unique index on `files(rel_path, device_id)` if missing, and (2) upgrades the `devices` table from raw-token PK to UUID PK + `token_hash` column, rewriting `files.device_id` references accordingly.
 
 ### Web UI
 
 File browser at `localhost:9876` with three views: All Files, Local, Server.
 
 | Endpoint | Method | Purpose |
-
+|---|---|---|
 | `/` | GET | Dashboard HTML (embedded via `//go:embed`) |
 | `/api/status` | GET | Daemon status JSON |
 | `/api/force-sync` | POST | Trigger full sync |
@@ -113,6 +115,8 @@ Mutating endpoints acquire a shared `sync.Mutex` to prevent races with backgroun
 - **Download phase — own-device priority**: the download pass runs in two stages. First, all paths this device already owns on the server are marked. Then, when iterating cross-device files, any path already owned by this device is skipped entirely — another device's copy never overwrites your own version. Cross-device files with no local ownership are downloaded normally (first-encountered wins when multiple foreign devices share a path).
 - **Client-wins conflict resolution**: if hashes differ, client re-uploads its version
 - **Deletion detection**: comparing `state.json` against current disk contents; local deletions do not cascade to server
+- **Connection timeout**: All sync dial attempts use a 10-second timeout (`syncDialTimeout`). If the server is unreachable, the sync fails immediately with a clear error instead of hanging silently.
+- **Import size cap**: The `/api/files/import` endpoint enforces a 512 MiB per-request body limit via `http.MaxBytesReader`; requests exceeding this return HTTP 413.
 - **Zero-byte files**: handled with immediate finalization (no chunk transfer)
 - **Scanner skips**: `.git`, `server` directories, `.DS_Store` files
 
@@ -127,12 +131,14 @@ sync_dir    = "~/VaultDrive"
 device_name = "MyLaptop"
 ```
 
+`MYDRIVE_TOKEN` environment variable overrides the `token` field from `config.toml` when non-empty. Useful for scripting or CI scenarios.
+
 **Client state**: `~/.mydrive/state.json` — tracks `relPath → hash` for deletion detection.
 
 **Server config** (environment variables):
 
 | Variable | Default | Purpose |
-
+|---|---|---|
 | `MYDRIVE_DB_PATH` | `./mydrive.db` | SQLite database path |
 | `MYDRIVE_DATA_DIR` | `./VaultData` | Object store root |
 
@@ -141,5 +147,5 @@ Server listens on `:9000`. Web UI listens on `127.0.0.1:9876`.
 ## Security Notes
 
 - `config.toml` contains the auth token in plaintext — restrict file permissions on the homelab machine
-- The `devices` table stores tokens as plaintext primary keys — consider hashing tokens for production use
+- Raw tokens are never stored — the `devices` table stores only `HMAC-SHA256(key="mydrive-v1", data=token)` as `token_hash`; the raw token is discarded after registration.
 - All relative paths are validated against path traversal attacks (`..`) on both client and server sides
