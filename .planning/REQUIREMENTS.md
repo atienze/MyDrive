@@ -18,8 +18,8 @@
 - [x] **FILE-02**: File table with four columns — Name (colored extension badge + filename), Modified (formatted date/time), Size (formatted), Sync (status dot)
 - [x] **FILE-03**: Folders listed before files; folder rows show `—` for Modified and Size; synthetic folder entries reconstructed client-side from flat `rel_path` strings
 - [x] **FILE-04**: Table rows highlight on hover; 0.5px border-bottom dividers between rows; table container has 6px border-radius with 0.5px border
-- [ ] **FILE-05**: Footer bar shows item count + total size on left; Upload and New Folder buttons on right (present but non-functional stubs in v1)
-- [ ] **FILE-06**: Sync status dot — green if file exists on both client and server with matching hash; amber if pending/mismatched; derived by comparing `/api/files/server` and `/api/files/client` responses
+- [x] **FILE-05**: Footer bar shows item count + total size on left; Upload and New Folder buttons on right (present but non-functional stubs in v1)
+- [x] **FILE-06**: Sync status dot — green if file exists on both client and server with matching hash; amber if pending/mismatched; derived by comparing `/api/files/server` and `/api/files/client` responses
 
 ### Global Layout
 
@@ -79,8 +79,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FILE-02 | Phase 2 | Complete |
 | FILE-03 | Phase 2 | Complete |
 | FILE-04 | Phase 2 | Complete |
-| FILE-05 | Phase 2 | Pending |
-| FILE-06 | Phase 2 | Pending |
+| FILE-05 | Phase 2 | Complete |
+| FILE-06 | Phase 2 | Complete |
 | GLOB-06 | Phase 2 | Complete |
 | GLOB-04 | Phase 3 | Pending |
 
