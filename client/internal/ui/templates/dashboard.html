@@ -100,6 +100,162 @@
       margin-left: 16px;
     }
     #app-main { flex: 1; overflow-y: auto; }
+
+    /* Overview layout */
+    #view-overview {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    /* Donut chart */
+    .donut-wrap {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .donut-svg { transform: rotate(-90deg); }
+    .donut-track {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 18;
+    }
+    .donut-used {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 18;
+      stroke-linecap: round;
+      transition: stroke-dasharray 0.6s ease;
+    }
+    .donut-label {
+      position: absolute;
+      text-align: center;
+      pointer-events: none;
+    }
+    .donut-free-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+    .donut-free-unit {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    /* Stat cards */
+    .stat-cards {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      justify-content: center;
+    }
+    .stat-card {
+      flex: 1;
+      background: var(--bg-surface);
+      border: var(--border-width) solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      min-width: 0;
+    }
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .stat-value.sync-ok   { color: var(--success); }
+    .stat-value.sync-busy { color: var(--warn); }
+
+    /* Activity feed */
+    .activity-section { width: 100%; }
+    .activity-heading {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .activity-list {
+      background: var(--bg-surface);
+      border: var(--border-width) solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .activity-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: var(--border-width) solid var(--border);
+      font-size: 13px;
+    }
+    .activity-row:last-child { border-bottom: none; }
+    .activity-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-up   { background: var(--accent);   color: var(--accent-text); }
+    .badge-down { background: var(--success);  color: #fff; }
+    .badge-del  { background: var(--danger);   color: #fff; }
+    .badge-sync { background: var(--warn);     color: #fff; }
+    .activity-filename {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+    .activity-meta {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* Browse button */
+    .browse-btn {
+      background: transparent;
+      border: var(--border-width) solid var(--accent);
+      color: var(--accent);
+      border-radius: var(--radius-md);
+      padding: 8px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: var(--font);
+    }
+    .browse-btn:hover { background: var(--accent); color: var(--accent-text); }
+
+    /* Empty state */
+    .activity-empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
