@@ -387,6 +387,31 @@
     }
     .sync-dot.synced { background: var(--success); }
     .sync-dot.amber  { background: var(--warn); }
+
+    /* ---- Files footer (FILE-05) ---- */
+    #files-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      gap: 12px;
+    }
+    .footer-summary { flex: 1; }
+    .footer-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .footer-btn {
+      background: transparent;
+      border: var(--border-width) solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: var(--font);
+      color: var(--text-secondary);
+      cursor: not-allowed;   /* stub — non-functional in v1 */
+      opacity: 0.5;
+    }
   </style>
 </head>
 <body>
@@ -477,9 +502,11 @@
 
     const App = {
       activeTab: 'overview',
-      filesPath: '',           // only reset on explicit Home breadcrumb click
-      cachedFilesViewData: [], // set by loadFilesViewData; read by renderFilesTable
-      cachedServerFiles: [],   // set by Plan 02 for sync dot computation
+      filesPath: '',                     // only reset on explicit Home breadcrumb click
+      cachedFilesViewData: [],           // set by loadFilesViewData; read by renderFilesTable
+      cachedServerFiles: [],             // set by Plan 02 for sync dot computation
+      cachedClientMap: Object.create(null), // keyed by rel_path for O(1) sync checks
+      cachedServerMap: Object.create(null), // keyed by rel_path for O(1) sync checks
     };
 
     function switchTab(tab) {
@@ -715,8 +742,9 @@
         // Show em dash until Phase 3 or a future API addition provides it.
         const modified = f.modified ? formatModified(f.modified) : '\u2014';
         const size = f.size_human || formatBytes(f.size || 0);
-        // Sync dot: amber placeholder; Plan 02 replaces with real synced/amber logic.
-        const dotHtml = '<span class="sync-dot amber"></span>';
+        // Sync dot: real sync status from both maps (FILE-06)
+        const status = computeSyncStatus(f.rel_path, App.cachedClientMap || {}, App.cachedServerMap || {});
+        const dotHtml = '<span class="sync-dot ' + status + '"></span>';
         html += '<tr>' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + modified + '</td>' +
@@ -726,6 +754,7 @@
       }
 
       tbody.innerHTML = html;
+      renderFilesFooter();
     }
 
     // ---- Format modified date ----
@@ -737,14 +766,66 @@
       return d.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
+    // ---- Safe path encoding (FILE-03, special chars) ----
+    // Encodes each segment of a rel_path individually so spaces, ampersands,
+    // and non-ASCII characters do not break fetch() URL construction.
+    // Example: "photos/île de ré/img.jpg" → "photos/%C3%AEle%20de%20r%C3%A9/img.jpg"
+    function safeEncodePath(relPath) {
+      return relPath.split('/').map(encodeURIComponent).join('/');
+    }
+
+    // ---- Sync status computation (FILE-06) ----
+    // Returns 'synced' if relPath exists in both cachedServerMap and cachedClientMap
+    // with identical hash values. Returns 'amber' for all other cases.
+    // cachedServerMap: { [rel_path]: { hash, ... } } built from /api/files/server
+    // cachedClientMap: { [rel_path]: { hash, ... } } built from /api/files/client
+    function computeSyncStatus(relPath, cachedClientMap, cachedServerMap) {
+      const inClient = Object.prototype.hasOwnProperty.call(cachedClientMap, relPath);
+      const inServer = Object.prototype.hasOwnProperty.call(cachedServerMap, relPath);
+      if (inClient && inServer && cachedClientMap[relPath].hash === cachedServerMap[relPath].hash) {
+        return 'synced';
+      }
+      return 'amber';
+    }
+
+    // ---- Footer renderer (FILE-05) ----
+    // Shows item count + total size for the CURRENT directory level (not all files).
+    // Only counts direct children visible in the current path (folders + files at this level).
+    // Upload and New Folder buttons are non-functional stubs in v1.
+    function renderFilesFooter() {
+      const footer = document.getElementById('files-footer');
+      if (!footer) return;
+      const allFiles = App.cachedFilesViewData || [];
+      const { folders, files } = getFilesViewEntries(allFiles, App.filesPath);
+
+      const itemCount = folders.length + files.length;
+      const totalBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
+
+      const countLabel = itemCount === 1 ? '1 item' : itemCount + ' items';
+      const sizeLabel = files.length > 0 ? ' \u2014 ' + formatBytes(totalBytes) : '';
+
+      footer.innerHTML =
+        '<span class="footer-summary">' + escapeHtml(countLabel + sizeLabel) + '</span>' +
+        '<div class="footer-actions">' +
+          '<button class="footer-btn" title="Upload file (v2)" onclick="void(0)">Upload</button>' +
+          '<button class="footer-btn" title="New folder (v2)" onclick="void(0)">New Folder</button>' +
+        '</div>';
+    }
+
     // ---- Load Files view data and render ----
     // Stores all files from /api/files/client into App.cachedFilesViewData.
     // Does NOT reset App.filesPath — navigation state is preserved across refreshes.
     // Called from fixture bootstrap below and from Phase 3 poll loop.
-    function loadFilesViewData(clientFiles) {
+    function loadFilesViewData(clientFiles, serverFiles) {
       App.cachedFilesViewData = clientFiles || [];
+      // Build lookup maps keyed by rel_path for O(1) sync status checks
+      App.cachedClientMap = Object.create(null);
+      for (const f of App.cachedFilesViewData) App.cachedClientMap[f.rel_path] = f;
+      App.cachedServerFiles = serverFiles || [];
+      App.cachedServerMap = Object.create(null);
+      for (const f of App.cachedServerFiles) App.cachedServerMap[f.rel_path] = f;
       renderBreadcrumb();
-      renderFilesTable();
+      renderFilesTable(); // renderFilesTable now calls renderFilesFooter() at the end
     }
 
     // ---- Files view fixture data ----
