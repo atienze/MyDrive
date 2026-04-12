@@ -14,10 +14,10 @@
 
 ### Files View
 
-- [ ] **FILE-01**: Breadcrumb path bar at top shows current directory path (e.g. `/ home / documents`); each segment is clickable and navigates to that path level
-- [ ] **FILE-02**: File table with four columns — Name (colored extension badge + filename), Modified (formatted date/time), Size (formatted), Sync (status dot)
-- [ ] **FILE-03**: Folders listed before files; folder rows show `—` for Modified and Size; synthetic folder entries reconstructed client-side from flat `rel_path` strings
-- [ ] **FILE-04**: Table rows highlight on hover; 0.5px border-bottom dividers between rows; table container has 6px border-radius with 0.5px border
+- [x] **FILE-01**: Breadcrumb path bar at top shows current directory path (e.g. `/ home / documents`); each segment is clickable and navigates to that path level
+- [x] **FILE-02**: File table with four columns — Name (colored extension badge + filename), Modified (formatted date/time), Size (formatted), Sync (status dot)
+- [x] **FILE-03**: Folders listed before files; folder rows show `—` for Modified and Size; synthetic folder entries reconstructed client-side from flat `rel_path` strings
+- [x] **FILE-04**: Table rows highlight on hover; 0.5px border-bottom dividers between rows; table container has 6px border-radius with 0.5px border
 - [ ] **FILE-05**: Footer bar shows item count + total size on left; Upload and New Folder buttons on right (present but non-functional stubs in v1)
 - [ ] **FILE-06**: Sync status dot — green if file exists on both client and server with matching hash; amber if pending/mismatched; derived by comparing `/api/files/server` and `/api/files/client` responses
 
@@ -28,7 +28,7 @@
 - [x] **GLOB-03**: Light/dark mode via CSS custom properties at `:root`; one `@media (prefers-color-scheme: dark)` block overrides token values; no JS, no runtime toggle, no flash-of-wrong-theme
 - [ ] **GLOB-04**: All data fetched from existing Go API endpoints (`/api/status`, `/api/files/server`, `/api/files/client`); 10-second poll loop with `Promise.all`; error banner displayed if server unreachable
 - [x] **GLOB-05**: Storage calculation: sum of `size` fields from `/api/files/server` response = used bytes; `TOTAL_BYTES = 250 * 1024 ** 3` JS constant; free = total − used
-- [ ] **GLOB-06**: File-type extension badges: small colored pill with abbreviated extension text (e.g. green `{}` for yml/yaml, blue `M` for md, grey `◇` for unknown); no CDN icon library; inline only
+- [x] **GLOB-06**: File-type extension badges: small colored pill with abbreviated extension text (e.g. green `{}` for yml/yaml, blue `M` for md, grey `◇` for unknown); no CDN icon library; inline only
 - [x] **GLOB-07**: Flat aesthetic — no box shadows, no gradients; 0.5px borders (`rgba(0,0,0,0.08)`); generous whitespace; system font stack
 
 ## v2 Requirements
@@ -75,13 +75,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OVR-02 | Phase 1 | Complete |
 | OVR-03 | Phase 1 | Complete |
 | OVR-04 | Phase 1 | Complete |
-| FILE-01 | Phase 2 | Pending |
-| FILE-02 | Phase 2 | Pending |
-| FILE-03 | Phase 2 | Pending |
-| FILE-04 | Phase 2 | Pending |
+| FILE-01 | Phase 2 | Complete |
+| FILE-02 | Phase 2 | Complete |
+| FILE-03 | Phase 2 | Complete |
+| FILE-04 | Phase 2 | Complete |
 | FILE-05 | Phase 2 | Pending |
 | FILE-06 | Phase 2 | Pending |
-| GLOB-06 | Phase 2 | Pending |
+| GLOB-06 | Phase 2 | Complete |
 | GLOB-04 | Phase 3 | Pending |
 
 **Coverage:**
