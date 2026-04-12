@@ -446,7 +446,30 @@
       <!-- Browse files button -->
       <button class="browse-btn" onclick="switchTab('files')">Browse files ↗</button>
     </div>
-    <div id="view-files" style="display:none"><!-- Files content: Phase 2 --></div>
+    <div id="view-files" style="display:none">
+      <!-- Breadcrumb path bar (FILE-01) -->
+      <div id="files-breadcrumb" aria-label="Current path"></div>
+
+      <!-- File table (FILE-02, FILE-03, FILE-04) -->
+      <div class="files-table-wrap">
+        <table class="files-table" aria-label="Files">
+          <thead>
+            <tr>
+              <th style="width:50%">Name</th>
+              <th style="width:20%">Modified</th>
+              <th style="width:15%">Size</th>
+              <th style="width:15%">Sync</th>
+            </tr>
+          </thead>
+          <tbody id="files-tbody">
+            <tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer bar: Plan 02 adds this -->
+      <div id="files-footer"></div>
+    </div>
   </main>
 
   <script>
@@ -454,7 +477,9 @@
 
     const App = {
       activeTab: 'overview',
-      filesPath: '',  // only reset on explicit Home breadcrumb click
+      filesPath: '',           // only reset on explicit Home breadcrumb click
+      cachedFilesViewData: [], // set by loadFilesViewData; read by renderFilesTable
+      cachedServerFiles: [],   // set by Plan 02 for sync dot computation
     };
 
     function switchTab(tab) {
@@ -562,6 +587,185 @@
         '</div>';
       }).join('');
     }
+
+    // ---- Extension badge (GLOB-06) ----
+    // Returns HTML string for the colored pill. Uses CSS classes only — no hex in this string.
+    function extensionBadge(filename) {
+      const dot = filename.lastIndexOf('.');
+      const ext = dot === -1 ? '' : filename.slice(dot + 1).toLowerCase();
+      const MAP = {
+        yml: 'ext-green',  yaml: 'ext-green', json: 'ext-green', toml: 'ext-green', xml: 'ext-green',
+        md:  'ext-blue',   txt: 'ext-blue',   csv: 'ext-blue',   log: 'ext-blue',
+        pdf: 'ext-purple', doc: 'ext-purple', docx: 'ext-purple', ppt: 'ext-purple', pptx: 'ext-purple',
+        jpg: 'ext-orange', jpeg: 'ext-orange', png: 'ext-orange', gif: 'ext-orange',
+        webp: 'ext-orange', svg: 'ext-orange', ico: 'ext-orange',
+        zip: 'ext-red', tar: 'ext-red', gz: 'ext-red', bz2: 'ext-red', '7z': 'ext-red', rar: 'ext-red',
+        go:  'ext-teal', py: 'ext-teal', js: 'ext-teal', ts: 'ext-teal',
+        sh:  'ext-teal', rs: 'ext-teal', c:  'ext-teal', cpp: 'ext-teal', h: 'ext-teal',
+        rb:  'ext-teal', java: 'ext-teal', swift: 'ext-teal', kt: 'ext-teal',
+      };
+      const cls = MAP[ext] || 'ext-grey';
+      // Label: up to 3 chars of extension, or folder icon char
+      const label = ext ? ext.slice(0, 3) : '\u25c7';
+      return '<span class="ext-badge ' + cls + '" aria-hidden="true">' + escapeHtml(label) + '</span>';
+    }
+
+    // ---- Folder icon SVG ----
+    // Inline SVG for folder rows. stroke/fill via class, not hex.
+    function folderIconSvg() {
+      return '<svg class="folder-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+    }
+
+    // ---- Folder reconstruction from flat rel_path array (FILE-03) ----
+    // Given all files and a currentPath prefix (e.g. '' or 'docs/'), returns:
+    //   { folders: [string], files: [fileObj] }
+    // Folders are synthetic — derived from path segments beyond currentPath.
+    // Files are direct children at currentPath level (no further '/' in remainder).
+    function getFilesViewEntries(files, currentPath) {
+      const folderSet = Object.create(null);
+      const directFiles = [];
+      for (const f of files) {
+        if (!f.rel_path.startsWith(currentPath)) continue;
+        const remainder = f.rel_path.slice(currentPath.length);
+        const slash = remainder.indexOf('/');
+        if (slash !== -1) {
+          folderSet[remainder.slice(0, slash)] = true;
+        } else {
+          directFiles.push(f);
+        }
+      }
+      const folders = Object.keys(folderSet).sort((a, b) => a.localeCompare(b));
+      directFiles.sort((a, b) => {
+        // Sort files by filename (last path segment)
+        const na = a.rel_path.slice(currentPath.length);
+        const nb = b.rel_path.slice(currentPath.length);
+        return na.localeCompare(nb);
+      });
+      return { folders, files: directFiles };
+    }
+
+    // ---- Breadcrumb renderer (FILE-01) ----
+    // Rebuilds #files-breadcrumb from App.filesPath.
+    // Only the Home segment resets App.filesPath — intermediate clicks navigate to that level.
+    function renderBreadcrumb() {
+      const bc = document.getElementById('files-breadcrumb');
+      if (!bc) return;
+      const path = App.filesPath; // e.g. '' or 'docs/' or 'docs/2024/'
+      const parts = path ? path.split('/').filter(Boolean) : [];
+
+      let html = '<button class="bc-seg" onclick="filesNavTo(\'\')">Home</button>';
+      let accumulated = '';
+      for (let i = 0; i < parts.length; i++) {
+        accumulated += parts[i] + '/';
+        html += '<span class="bc-sep">/</span>';
+        if (i < parts.length - 1) {
+          // Intermediate: clickable to navigate to that level
+          const target = accumulated; // captured for closure via data attribute
+          html += '<button class="bc-seg" onclick="filesNavTo(\'' + escapeHtml(target) + '\')">' + escapeHtml(parts[i]) + '</button>';
+        } else {
+          // Current segment: not clickable
+          html += '<span class="bc-cur">' + escapeHtml(parts[i]) + '</span>';
+        }
+      }
+      bc.innerHTML = html;
+    }
+
+    // ---- Navigate to a path in the Files view ----
+    // path: '' = root, 'docs/' = docs folder, 'docs/2024/' = nested
+    // Only call this from user interaction (folder click, breadcrumb click).
+    // Do NOT call from data refresh — refreshes must preserve App.filesPath.
+    function filesNavTo(path) {
+      App.filesPath = path;
+      renderBreadcrumb();
+      renderFilesTable();
+    }
+
+    // ---- Files table renderer (FILE-02, FILE-03) ----
+    // Reads from App.cachedFilesViewData (set by loadFilesViewData).
+    // Renders folder rows first (FILE-03), then file rows.
+    // Sync dot rendered as amber placeholder here; Plan 02 replaces with real computation.
+    function renderFilesTable() {
+      const tbody = document.getElementById('files-tbody');
+      if (!tbody) return;
+      const allFiles = App.cachedFilesViewData || [];
+      const { folders, files } = getFilesViewEntries(allFiles, App.filesPath);
+
+      if (folders.length === 0 && files.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--text-muted)">This folder is empty</td></tr>';
+        return;
+      }
+
+      let html = '';
+
+      // Folder rows first (FILE-03): Modified and Size show em dash
+      for (const folderName of folders) {
+        const fullFolderPath = App.filesPath + folderName + '/';
+        html += '<tr class="row-folder" onclick="filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+          '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
+          '<td class="td-muted">\u2014</td>' +
+          '<td class="td-muted">\u2014</td>' +
+          '<td></td>' +
+          '</tr>';
+      }
+
+      // File rows
+      for (const f of files) {
+        const name = f.rel_path.slice(App.filesPath.length);
+        // Modified: /api/files/client and /api/files/server do not return a modified time field.
+        // Show em dash until Phase 3 or a future API addition provides it.
+        const modified = f.modified ? formatModified(f.modified) : '\u2014';
+        const size = f.size_human || formatBytes(f.size || 0);
+        // Sync dot: amber placeholder; Plan 02 replaces with real synced/amber logic.
+        const dotHtml = '<span class="sync-dot amber"></span>';
+        html += '<tr>' +
+          '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
+          '<td class="td-muted td-mono">' + modified + '</td>' +
+          '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
+          '<td>' + dotHtml + '</td>' +
+          '</tr>';
+      }
+
+      tbody.innerHTML = html;
+    }
+
+    // ---- Format modified date ----
+    // API does not currently return a modified field; this is defensive future-proofing.
+    function formatModified(isoString) {
+      if (!isoString) return '\u2014';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '\u2014';
+      return d.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    // ---- Load Files view data and render ----
+    // Stores all files from /api/files/client into App.cachedFilesViewData.
+    // Does NOT reset App.filesPath — navigation state is preserved across refreshes.
+    // Called from fixture bootstrap below and from Phase 3 poll loop.
+    function loadFilesViewData(clientFiles) {
+      App.cachedFilesViewData = clientFiles || [];
+      renderBreadcrumb();
+      renderFilesTable();
+    }
+
+    // ---- Files view fixture data ----
+    // Fixture client files — used until Phase 3 wires live API poll.
+    // Demonstrates folder reconstruction, nested paths, and diverse extensions (GLOB-06).
+    const FIXTURE_CLIENT_FILES = [
+      { rel_path: 'notes/meeting.md',          size: 4096,        size_human: '4 KB'   },
+      { rel_path: 'notes/todo.txt',            size: 1024,        size_human: '1 KB'   },
+      { rel_path: 'photos/trip/img001.jpg',    size: 3200000,     size_human: '3.1 MB' },
+      { rel_path: 'photos/trip/img002.png',    size: 2800000,     size_human: '2.7 MB' },
+      { rel_path: 'photos/portrait.webp',      size: 800000,      size_human: '781 KB' },
+      { rel_path: 'backup/db.sqlite',          size: 512000000,   size_human: '488 MB' },
+      { rel_path: 'backup/logs.tar.gz',        size: 10240000,    size_human: '9.8 MB' },
+      { rel_path: 'docs/report.pdf',           size: 2100000,     size_human: '2 MB'   },
+      { rel_path: 'config.toml',              size: 512,         size_human: '512 B'  },
+      { rel_path: 'README.md',               size: 3072,        size_human: '3 KB'   },
+      { rel_path: 'sync\u00e9.go',           size: 8192,        size_human: '8 KB'   }, // non-ASCII filename
+    ];
+
+    // Boot: load Files view with fixture data immediately so switching to Files tab shows content
+    loadFilesViewData(FIXTURE_CLIENT_FILES);
 
     function escapeHtml(str) {
       return String(str)
