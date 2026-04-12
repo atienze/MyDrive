@@ -1,1177 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>myDrive Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>myDrive</title>
+  <style>
+    :root {
+      --bg-base:        #f5f5f7;
+      --bg-surface:     #ffffff;
+      --bg-header:      #ffffff;
+      --border:         rgba(0,0,0,0.08);
+      --border-width:   0.5px;
+      --text-primary:   #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-muted:     #aeaeb2;
+      --accent:         #0071e3;
+      --accent-hover:   #0077ed;
+      --accent-text:    #ffffff;
+      --success:        #34c759;
+      --warn:           #ff9f0a;
+      --danger:         #ff3b30;
+      --font:           -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --radius-sm:      4px;
+      --radius-md:      6px;
+      --radius-lg:      8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-base:        #000000;
+        --bg-surface:     #1c1c1e;
+        --bg-header:      #1c1c1e;
+        --border:         rgba(255,255,255,0.10);
+        --text-primary:   #f5f5f7;
+        --text-secondary: #98989d;
+        --text-muted:     #636366;
+        --accent:         #0a84ff;
+        --accent-hover:   #409cff;
+        --accent-text:    #ffffff;
+        --success:        #30d158;
+        --warn:           #ffd60a;
+        --danger:         #ff453a;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* NO box-shadow, NO gradient anywhere — GLOB-07 flat aesthetic */
+    /* Borders use var(--border) at var(--border-width) (0.5px) */
+
+    #app-header {
+      background: var(--bg-header);
+      border-bottom: var(--border-width) solid var(--border);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .brand-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .nav-tabs { display: flex; gap: 0; margin-left: auto; }
+    .tab {
+      padding: 0 16px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      user-select: none;
+    }
+    .tab.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--accent);
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-text);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 16px;
+    }
+    #app-main { flex: 1; overflow-y: auto; }
+  </style>
 </head>
-<body class="font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',sans-serif] m-0 p-0">
-    <!-- Outermost container: full viewport, flex row on desktop, column on mobile -->
-    <div class="h-dvh flex flex-col lg:flex-row bg-[#1a1a2e] text-[#e0e0e0]">
-
-        <!-- Sidebar backdrop (mobile only) -->
-        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"></div>
-
-        <!-- Sidebar -->
-        <aside id="sidebar" class="w-56 bg-[#16213e] border-r border-[#2a2a4a] shrink-0 hidden lg:flex flex-col fixed lg:static inset-y-0 left-0 z-50">
-            <!-- Brand -->
-            <div class="p-4 border-b border-[#2a2a4a] flex items-center gap-2">
-                <svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span class="text-base font-semibold tracking-wide">myDrive</span>
-            </div>
-            <!-- Navigation -->
-            <div>
-                <div class="text-[10px] uppercase tracking-widest text-[#556] px-4 pt-4 pb-2">Navigation</div>
-                <nav id="sidebar-nav" class="flex flex-col gap-0.5 px-2">
-                    <div data-view="all" onclick="switchView('all')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer bg-[#1a1a2e]">
-                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-                        All Files
-                    </div>
-                    <div data-view="local" onclick="switchView('local')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
-                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-                        Local Files
-                    </div>
-                    <div data-view="server" onclick="switchView('server')" class="flex items-center gap-3 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-[#1a1a2e]">
-                        <svg class="w-4 h-4 text-[#888]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
-                        Server Files
-                    </div>
-                </nav>
-            </div>
-            <!-- Spacer -->
-            <div class="flex-1"></div>
-            <!-- Bottom: device name -->
-            <div id="sidebar-device-name" class="text-xs text-[#556] p-4 border-t border-[#2a2a4a]">Loading...</div>
-        </aside>
-
-        <!-- Right column: header + content -->
-        <div class="flex-1 flex flex-col min-h-0">
-
-            <!-- Header bar -->
-            <header class="h-14 bg-[#16213e] border-b border-[#2a2a4a] flex items-center justify-between px-4 shrink-0">
-                <div class="flex items-center gap-3">
-                    <button id="menu-btn" onclick="toggleSidebar()" class="lg:hidden bg-transparent border-none text-[#888] hover:text-[#ccc] cursor-pointer p-1">
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-                    </button>
-                    <div id="header-title" class="text-lg font-semibold">All Files</div>
-                </div>
-                <div class="flex-1 max-w-xs mx-4 hidden sm:block">
-                    <input type="search" id="search-input" placeholder="Search all files..."
-                           oninput="updateSearch(this.value)"
-                           class="w-full bg-[#0f1a2e] border border-[#2a2a4a] rounded-md px-3 py-1.5 text-sm text-[#d0d8f0] placeholder-[#556] focus:outline-none focus:border-[#4d9eff44]">
-                </div>
-                <div class="flex items-center gap-4">
-                    <!-- Sync stats -->
-                    <div class="text-xs text-[#888] hidden sm:flex items-center gap-1.5">
-                        <span id="header-file-count">0 files</span>
-                        <span class="text-[#556]">|</span>
-                        <span id="header-total-size">0 B</span>
-                    </div>
-                    <!-- Last sync -->
-                    <span id="header-last-sync" class="text-xs text-[#888] hidden sm:inline">Never synced</span>
-                    <!-- Connection indicator -->
-                    <div class="flex items-center gap-1.5 text-[13px] text-[#aaa]">
-                        <span id="conn-dot" class="inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]"></span>
-                        <span id="conn-text">Disconnected</span>
-                    </div>
-                    <!-- Sync button -->
-                    <button id="sync-btn" onclick="forceSync()" class="bg-[#0f62fe] hover:bg-[#0043ce] text-white text-sm font-medium px-4 py-1.5 rounded-md disabled:bg-[#2a2a4a] disabled:text-[#666] disabled:cursor-not-allowed cursor-pointer border-none">Full Sync</button>
-                </div>
-            </header>
-
-            <!-- Mobile search bar (hidden on lg+, shown on mobile where header search is hidden) -->
-            <div class="lg:hidden px-4 py-2 bg-[#16213e] border-b border-[#2a2a4a] shrink-0">
-                <input type="search" placeholder="Search all files..."
-                       oninput="updateSearch(this.value)"
-                       class="w-full bg-[#0f1a2e] border border-[#2a2a4a] rounded-md px-3 py-1.5 text-sm text-[#d0d8f0] placeholder-[#556] focus:outline-none focus:border-[#4d9eff44]">
-            </div>
-
-            <!-- Content area -->
-            <main class="flex-1 overflow-y-auto p-4 min-h-0 pb-16 lg:pb-4">
-                <!-- Error banner -->
-                <div id="error-banner" class="bg-[#3a1c1c] border border-[#f24c4c44] rounded-md px-4 py-3 mb-4 text-[13px] text-[#f24c4c] hidden"></div>
-
-                <!-- Status cards -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
-                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Connection</div>
-                        <div class="text-base font-semibold flex items-center gap-1.5">
-                            <span id="status-conn-dot" class="inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]"></span>
-                            <span id="status-conn-text">Disconnected</span>
-                        </div>
-                    </div>
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
-                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Sync Status</div>
-                        <div class="text-base font-semibold flex items-center gap-1.5">
-                            <span id="sync-dot" class="inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]"></span>
-                            <span id="sync-text">Idle</span>
-                        </div>
-                    </div>
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
-                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Synced Files</div>
-                        <div class="text-base font-semibold" id="total-files">0</div>
-                        <div class="text-xs text-[#888] mt-1" id="total-size">0 B</div>
-                    </div>
-                    <div class="bg-[#16213e] border border-[#2a2a4a] rounded-lg px-4 py-3.5">
-                        <div class="text-[11px] uppercase tracking-wider text-[#888] mb-1.5">Last Sync</div>
-                        <div class="text-base font-semibold" id="last-sync-time">Never</div>
-                        <div class="text-xs text-[#888] mt-1" id="last-sync-detail"></div>
-                    </div>
-                </div>
-
-                <!-- File browser two-panel grid -->
-                <div id="file-panels" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                    <!-- Left panel: local files -->
-                    <div id="local-panel" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
-                        <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
-                            <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Local</div>
-                            <div class="text-[11px] text-[#556] mt-0.5 font-mono" id="local-path">~/VaultDrive</div>
-                        </div>
-                        <div id="local-breadcrumb"></div>
-                        <div id="local-file-list" class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                            <div class="col-span-full py-6 text-center text-[#556] text-[13px]">Loading...</div>
-                        </div>
-                    </div>
-
-                    <!-- Right panel: server files -->
-                    <div id="server-panel" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg overflow-hidden">
-                        <div class="px-4 py-3 border-b border-[#2a2a4a] bg-[#1a2444]">
-                            <div class="text-xs uppercase tracking-wider text-[#8899bb] font-semibold">Server</div>
-                            <div class="text-[11px] text-[#556] mt-0.5 font-mono">Remote storage</div>
-                        </div>
-                        <div id="server-file-list">
-                            <div class="col-span-full py-6 text-center text-[#556] text-[13px]">Loading...</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Activity log -->
-                <div>
-                    <h2 class="text-xs uppercase tracking-wider text-[#888] mb-3">Activity Log</h2>
-                    <div id="activity-log" class="bg-[#16213e] border border-[#2a2a4a] rounded-lg max-h-[200px] overflow-y-auto">
-                        <div class="py-8 px-6 text-center text-[#556] text-[13px]">No activity yet</div>
-                    </div>
-                </div>
-            </main>
-        </div>
+<body>
+  <header id="app-header">
+    <div class="brand">
+      <!-- Triangle logo SVG: equilateral triangle, fill=var(--accent), 20x20 -->
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <polygon points="10,2 18,18 2,18" fill="var(--accent)"/>
+      </svg>
+      <span class="brand-name">myDrive</span>
     </div>
-
-    <!-- FAB: floating action button for quick push on mobile -->
-    <button id="fab-btn" onclick="openFabModal()" class="fixed bottom-20 right-4 lg:hidden z-50 w-14 h-14 rounded-full bg-[#0f62fe] hover:bg-[#0043ce] text-white shadow-lg flex items-center justify-center border-none cursor-pointer text-2xl transition-colors active:scale-95" title="Push unsynced files to server">+</button>
-    <input id="fab-file-input" type="file" multiple class="hidden" onchange="handleFabFileSelect(this)">
-
-    <!-- FAB bottom sheet: lists unsynced local files for quick push -->
-    <div id="fab-modal" class="fixed inset-0 z-[9998] hidden lg:hidden">
-        <div class="absolute inset-0 bg-black/60" onclick="closeFabModal()"></div>
-        <div class="absolute bottom-0 left-0 right-0 bg-[#16213e] border-t border-[#2a2a4a] rounded-t-2xl max-h-[70vh] flex flex-col" style="padding-bottom:env(safe-area-inset-bottom,0px)">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-[#2a2a4a] shrink-0">
-                <div>
-                    <div class="text-sm font-semibold text-[#e0e0e0]">Push to Server</div>
-                    <div class="text-[11px] text-[#556] mt-0.5">Local files not yet synced</div>
-                </div>
-                <button onclick="closeFabModal()" class="bg-transparent border-none text-[#888] hover:text-[#ccc] cursor-pointer p-1 text-lg leading-none">&#x2715;</button>
-            </div>
-            <div id="fab-modal-list" class="flex-1 overflow-y-auto p-3"></div>
-            <div class="px-4 py-3 border-t border-[#2a2a4a] shrink-0">
-                <button onclick="openFabImport()" class="w-full text-sm text-[#4d9eff] bg-transparent border border-[#2a2a4a] rounded-lg py-2.5 cursor-pointer active:bg-[#0d224422]">+ Import file from device</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Drop overlay (desktop drag-and-drop) -->
-    <div id="drop-overlay" class="fixed inset-0 z-[9999] bg-[#1a1a2e]/90 items-center justify-center hidden pointer-events-none">
-        <div class="border-2 border-dashed border-[#4d9eff] rounded-2xl p-12 text-center">
-            <svg class="w-16 h-16 mx-auto mb-4 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <div class="text-xl font-semibold text-[#e0e0e0] mb-1">Drop files to import</div>
-            <div class="text-sm text-[#888]">Files will be copied into your sync folder and pushed to the server</div>
-        </div>
-    </div>
-
-    <!-- Bottom navigation bar: mobile only -->
-    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-[#16213e] border-t border-[#2a2a4a] flex lg:hidden z-50 pb-[env(safe-area-inset-bottom,0px)]">
-        <div id="bnav-all" onclick="switchView('all')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#4d9eff]">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-            <span>All</span>
-        </div>
-        <div id="bnav-local" onclick="switchView('local')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#888]">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-            <span>Local</span>
-        </div>
-        <div id="bnav-server" onclick="switchView('server')" class="flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] cursor-pointer transition-colors text-[#888]">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
-            <span>Server</span>
-        </div>
+    <nav class="nav-tabs" id="nav-tabs">
+      <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
+      <div class="tab" data-tab="files" onclick="switchTab('files')">Files</div>
     </nav>
-
-    <script>
-        // ---- global state ----
-        var operationInFlight = false;
-        var currentDeviceName = '';
-
-        // ---- directory navigation state ----
-        var localCurrentPath = '';   // '' = root
-        var serverCurrentPath = ''; // '' = root
-        var cachedClientFiles = [];
-        var cachedServerFiles = [];
-        var cachedLocalMap = {};
-        var cachedServerMap = {};
-
-        // ---- search state ----
-        var searchQuery = '';
-
-        function updateSearch(val) {
-            searchQuery = val.trim().toLowerCase();
-            rerenderLocal();
-            rerenderServer();
-        }
-
-        // ---- sidebar toggle (mobile) ----
-        function toggleSidebar() {
-            var sidebar = document.getElementById('sidebar');
-            var backdrop = document.getElementById('sidebar-backdrop');
-            var isOpen = !sidebar.classList.contains('hidden') && sidebar.classList.contains('fixed');
-            if (window.innerWidth >= 1024) return; // lg breakpoint, sidebar always visible
-            if (isOpen) {
-                sidebar.classList.add('hidden');
-                backdrop.classList.add('hidden');
-            } else {
-                sidebar.classList.remove('hidden');
-                sidebar.classList.add('flex');
-                backdrop.classList.remove('hidden');
-            }
-        }
-
-        // ---- view switching ----
-        var currentView = 'all';
-
-        function switchView(view) {
-            currentView = view;
-            var titles = { all: 'All Files', local: 'Local Files', server: 'Server Files' };
-            document.getElementById('header-title').textContent = titles[view];
-
-            // Close sidebar on mobile after selection
-            if (window.innerWidth < 1024) {
-                document.getElementById('sidebar').classList.add('hidden');
-                document.getElementById('sidebar-backdrop').classList.add('hidden');
-            }
-
-            var localPanel = document.getElementById('local-panel');
-            var serverPanel = document.getElementById('server-panel');
-            var grid = document.getElementById('file-panels');
-
-            localPanel.classList.remove('hidden');
-            serverPanel.classList.remove('hidden');
-
-            if (view === 'all') {
-                grid.classList.remove('lg:grid-cols-1');
-                grid.classList.add('lg:grid-cols-2');
-            } else if (view === 'local') {
-                serverPanel.classList.add('hidden');
-                grid.classList.remove('lg:grid-cols-2');
-                grid.classList.add('lg:grid-cols-1');
-            } else {
-                localPanel.classList.add('hidden');
-                grid.classList.remove('lg:grid-cols-2');
-                grid.classList.add('lg:grid-cols-1');
-            }
-
-            // Update sidebar active state
-            var navItems = document.querySelectorAll('#sidebar-nav > div');
-            navItems.forEach(function(item) {
-                if (item.dataset.view === view) {
-                    item.className = item.className.replace('hover:bg-[#1a1a2e]', '').replace(/\s+/g, ' ').trim();
-                    if (item.className.indexOf('bg-[#1a1a2e]') === -1) {
-                        item.className += ' bg-[#1a1a2e]';
-                    }
-                } else {
-                    item.className = item.className.replace('bg-[#1a1a2e]', '').replace(/\s+/g, ' ').trim();
-                    if (item.className.indexOf('hover:bg-[#1a1a2e]') === -1) {
-                        item.className += ' hover:bg-[#1a1a2e]';
-                    }
-                }
-            });
-
-            // Update bottom nav active state
-            ['all', 'local', 'server'].forEach(function(v) {
-                var tab = document.getElementById('bnav-' + v);
-                if (tab) {
-                    tab.classList.remove('text-[#4d9eff]', 'text-[#888]');
-                    tab.classList.add(v === view ? 'text-[#4d9eff]' : 'text-[#888]');
-                }
-            });
-
-        }
-
-        // ---- error banner helpers ----
-        function showErrorBanner(msg) {
-            var banner = document.getElementById('error-banner');
-            banner.textContent = msg;
-            banner.classList.remove('hidden');
-        }
-        function hideErrorBanner() {
-            document.getElementById('error-banner').classList.add('hidden');
-        }
-
-        // ---- Tailwind button class constants ----
-        var BTN_BASE = 'px-1.5 py-0.5 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:py-2 rounded text-[10px] font-normal cursor-pointer border transition-all whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed';
-        var BTN_PUSH = BTN_BASE + ' text-[#4d9eff] border-transparent hover:border-[#4d9eff44] hover:bg-[#0d224422]';
-        var BTN_PULL = BTN_BASE + ' text-[#c080ff] border-transparent hover:border-[#c080ff44] hover:bg-[#2a0d4422]';
-        var BTN_DELETE = BTN_BASE + ' text-[#f24c4c] border-transparent hover:border-[#f24c4c33] hover:bg-[#2a0d0d22]';
-
-        // ---- helpers ----
-
-        function escapeHtml(str) {
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML.replace(/"/g, '&quot;');
-        }
-
-        function formatSize(bytes) {
-            if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
-            if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
-            if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return bytes + ' B';
-        }
-
-        function timeAgo(dateStr) {
-            var now = new Date();
-            var then = new Date(dateStr);
-            var seconds = Math.floor((now - then) / 1000);
-            if (seconds < 5) return 'just now';
-            if (seconds < 60) return seconds + 's ago';
-            var minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return minutes + 'm ago';
-            var hours = Math.floor(minutes / 60);
-            if (hours < 24) return hours + 'h ago';
-            return Math.floor(hours / 24) + 'd ago';
-        }
-
-        function formatTime(dateStr) {
-            var d = new Date(dateStr);
-            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        }
-
-
-        // ---- directory browsing helpers ----
-
-        function getEntriesAtPath(files, currentPath) {
-            var folderSet = {};
-            var filesAtLevel = [];
-            files.forEach(function(f) {
-                if (currentPath === '' || f.rel_path.indexOf(currentPath) === 0) {
-                    var remainder = currentPath === '' ? f.rel_path : f.rel_path.substring(currentPath.length);
-                    var slashIdx = remainder.indexOf('/');
-                    if (slashIdx !== -1) {
-                        folderSet[remainder.substring(0, slashIdx)] = true;
-                    } else {
-                        filesAtLevel.push(f);
-                    }
-                }
-            });
-            var folders = Object.keys(folderSet).sort();
-            return { folders: folders, files: filesAtLevel };
-        }
-
-        function folderFileCount(files, folderPath) {
-            var count = 0;
-            files.forEach(function(f) {
-                if (f.rel_path.indexOf(folderPath) === 0) count++;
-            });
-            return count;
-        }
-
-        function breadcrumbHtml(currentPath, panel, device) {
-            if (currentPath === '') return '';
-            var parts = currentPath.split('/').filter(function(s) { return s !== ''; });
-            var html = '<div class="text-[12px] font-mono flex items-center gap-1 flex-wrap px-4 py-2 bg-[#0f1a2e] border-b border-[#2a2a4a]">';
-            if (panel === 'local') {
-                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'\')">Root</span>';
-            } else {
-                html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'\')">Root</span>';
-            }
-            var accumulated = '';
-            for (var i = 0; i < parts.length; i++) {
-                accumulated += parts[i] + '/';
-                html += '<span class="text-[#556]">/</span>';
-                if (i < parts.length - 1) {
-                    if (panel === 'local') {
-                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToLocal(\'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
-                    } else {
-                        html += '<span class="cursor-pointer text-[#4d9eff] hover:underline" onclick="navToServer(\'' + escapeHtml(accumulated) + '\')">' + escapeHtml(parts[i]) + '</span>';
-                    }
-                } else {
-                    html += '<span class="text-[#d0d8f0]">' + escapeHtml(parts[i]) + '</span>';
-                }
-            }
-            html += '</div>';
-            return html;
-        }
-
-        function renderFolderCard(folderName, fileCount, onclick) {
-            var label = fileCount === 1 ? '1 file' : fileCount + ' files';
-            return '<div data-card class="bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-3 flex flex-col gap-2 hover:border-[#4d9eff44] transition-colors cursor-pointer" onclick="' + onclick + '">' +
-                '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="shrink-0 w-6 flex justify-center"><svg class="w-5 h-5 text-[#4d9eff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span>' +
-                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0">' + escapeHtml(folderName) + '</span>' +
-                '</div>' +
-                '<div class="flex items-center gap-2">' +
-                    '<span class="text-[11px] text-[#666]">' + label + '</span>' +
-                '</div>' +
-                '</div>';
-        }
-
-        // ---- navigation functions ----
-
-        function navToLocal(path) {
-            localCurrentPath = path;
-            rerenderLocal();
-        }
-
-        function navToServer(path) {
-            serverCurrentPath = path;
-            rerenderServer();
-        }
-
-        function rerenderLocal() {
-            var entries;
-            if (searchQuery) {
-                var matchingFiles = cachedClientFiles.filter(function(f) {
-                    return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
-                });
-                entries = { folders: [], files: matchingFiles };
-            } else {
-                entries = getEntriesAtPath(cachedClientFiles, localCurrentPath);
-            }
-            var bcHtml = searchQuery ? '' : breadcrumbHtml(localCurrentPath, 'local');
-            document.getElementById('local-breadcrumb').innerHTML = bcHtml;
-
-            var html = '';
-            if (!searchQuery) {
-                entries.folders.forEach(function(folderName) {
-                    var folderPath = localCurrentPath + folderName + '/';
-                    var count = folderFileCount(cachedClientFiles, folderPath);
-                    html += renderFolderCard(folderName, count, "navToLocal('" + escapeHtml(folderPath) + "')");
-                });
-            }
-            entries.files.forEach(function(f) {
-                var status = computeStatus(cachedLocalMap, cachedServerMap, f.rel_path);
-                var displayName = searchQuery ? f.rel_path : f.rel_path.substring(localCurrentPath.length);
-                html += renderLocalCard(f, status, displayName);
-            });
-
-            var localList = document.getElementById('local-file-list');
-            if (!html) {
-                if (searchQuery) {
-                    localList.innerHTML = '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
-                } else if (cachedClientFiles.length === 0) {
-                    localList.innerHTML = emptyStateHtml('local');
-                } else {
-                    localList.innerHTML = '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
-                }
-            } else {
-                localList.innerHTML = html;
-            }
-
-            if (operationInFlight) setButtonsDisabled(true);
-        }
-
-        function rerenderServer() {
-            var serverList = document.getElementById('server-file-list');
-            serverList.innerHTML = renderServerGroups(cachedServerFiles, cachedLocalMap);
-            if (operationInFlight) setButtonsDisabled(true);
-        }
-
-        // ---- disable/enable all action buttons ----
-
-        function setButtonsDisabled(disabled) {
-            var btns = document.querySelectorAll('button[data-action]');
-            btns.forEach(function(b) { b.disabled = disabled; });
-        }
-
-        // ---- file list join and render ----
-
-        function computeStatus(localMap, serverMap, relPath) {
-            var inLocal = localMap.hasOwnProperty(relPath);
-            var inServer = serverMap.hasOwnProperty(relPath);
-            if (inLocal && inServer) {
-                if (localMap[relPath].hash === serverMap[relPath].hash) {
-                    return 'synced';
-                }
-                return 'conflict';
-            }
-            if (inLocal) return 'local-only';
-            return 'server-only';
-        }
-
-        function badgeHtml(status) {
-            var base = 'inline-flex items-center text-[9px] font-normal tracking-wide uppercase opacity-70';
-            switch (status) {
-                case 'synced':     return '<span class="' + base + ' text-[#00d26a]">synced</span>';
-                case 'conflict':   return '<span class="' + base + ' text-[#f0c040]">conflict</span>';
-                case 'local-only': return '<span class="' + base + ' text-[#4d9eff]">local only</span>';
-                case 'server-only': return '<span class="' + base + ' text-[#c080ff]">server only</span>';
-            }
-            return '';
-        }
-
-        function makeBtn(cls, label, action, relPath, deviceId) {
-            var btnClass = cls === 'btn-push' ? BTN_PUSH : cls === 'btn-pull' ? BTN_PULL : BTN_DELETE;
-            var deviceAttr = deviceId ? ' data-device="' + escapeHtml(deviceId) + '"' : '';
-            return '<button class="' + btnClass + '" data-action="' + action + '" data-path="' + escapeHtml(relPath) + '"' + deviceAttr + '>' + label + '</button>';
-        }
-
-        function renderLocalCard(f, status, displayName) {
-            var visibleName = displayName || f.rel_path;
-            var actions = '';
-            if (status === 'local-only' || status === 'conflict') {
-                actions += makeBtn('btn-push', 'Push \u2192', 'upload', f.rel_path);
-            }
-            actions += makeBtn('btn-delete', 'Delete', 'delete-client', f.rel_path);
-
-            return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
-                '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
-                '</div>' +
-                '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
-                    '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
-                    badgeHtml(status) +
-                    '<span class="flex-1"></span>' +
-                    actions +
-                '</div>' +
-                '</div>';
-        }
-
-        function groupByDevice(serverFiles) {
-            var groups = {};
-            serverFiles.forEach(function(f) {
-                var device = f.device_id || 'Unknown Device';
-                if (!groups.hasOwnProperty(device)) groups[device] = [];
-                groups[device].push(f);
-            });
-            return groups;
-        }
-
-        function renderServerCard(f, localMap, device, isMine, displayName) {
-            var visibleName = displayName || f.rel_path;
-            var actions = '';
-            var alreadyLocal = localMap.hasOwnProperty(f.rel_path) && localMap[f.rel_path].hash === f.hash;
-            if (!alreadyLocal) {
-                actions += makeBtn('btn-pull', 'Pull here', 'pull-device', f.rel_path, device);
-            }
-            if (isMine) {
-                actions += makeBtn('btn-delete', 'Remove', 'delete-server', f.rel_path);
-            }
-            var localBadge = alreadyLocal ? '<span class="inline-flex items-center text-[9px] font-normal tracking-wide uppercase opacity-70 text-[#00d26a]">local copy</span>' : '';
-
-            return '<div data-card class="group bg-[#1a1a2e] border border-[#2a2a4a] rounded-lg p-2 flex flex-col gap-1 hover:border-[#4d9eff44] transition-colors">' +
-                '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span class="text-[13px] text-[#d0d8f0] overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(visibleName) + '</span>' +
-                '</div>' +
-                '<div class="flex items-center gap-2 mt-auto opacity-0 group-hover:opacity-100 [@media(pointer:coarse)]:opacity-100 transition-opacity duration-150">' +
-                    '<span class="text-[10px] text-[#555]">' + f.size_human + '</span>' +
-                    localBadge +
-                    '<span class="flex-1"></span>' +
-                    actions +
-                '</div>' +
-                '</div>';
-        }
-
-        function loadingHtml() {
-            return '<div class="col-span-full flex flex-col items-center justify-center py-12 gap-3">' +
-                '<svg class="animate-spin w-8 h-8 text-[#4d9eff]" viewBox="0 0 24 24" fill="none">' +
-                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>' +
-                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>' +
-                '</svg>' +
-                '<span class="text-[13px] text-[#556]">Loading files...</span>' +
-                '</div>';
-        }
-
-        function emptyStateHtml(type) {
-            var icon, title, subtitle;
-            if (type === 'local') {
-                icon = '<svg class="w-12 h-12 text-[#2a2a4a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
-                title = 'No local files';
-                subtitle = 'Files in your sync directory will appear here';
-            } else {
-                icon = '<svg class="w-12 h-12 text-[#2a2a4a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>';
-                title = 'No server files';
-                subtitle = 'Push files from your local directory to see them here';
-            }
-            return '<div class="col-span-full flex flex-col items-center justify-center py-16 gap-3">' +
-                icon +
-                '<div class="text-sm font-medium text-[#888]">' + title + '</div>' +
-                '<div class="text-[11px] text-[#556]">' + subtitle + '</div>' +
-                '</div>';
-        }
-
-        function renderServerGroups(serverFiles, localMap) {
-            if (!serverFiles || serverFiles.length === 0) {
-                return emptyStateHtml('server');
-            }
-            var entries;
-            if (searchQuery) {
-                var matchingFiles = serverFiles.filter(function(f) {
-                    return f.rel_path.toLowerCase().indexOf(searchQuery) !== -1;
-                });
-                entries = { folders: [], files: matchingFiles };
-            } else {
-                entries = getEntriesAtPath(serverFiles, serverCurrentPath);
-            }
-            var html = '';
-            if (!searchQuery) html += breadcrumbHtml(serverCurrentPath, 'server', '');
-            html += '<div class="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">';
-            if (!searchQuery) {
-                entries.folders.forEach(function(folderName) {
-                    var folderPath = serverCurrentPath + folderName + '/';
-                    var folderCount = folderFileCount(serverFiles, folderPath);
-                    html += renderFolderCard(folderName, folderCount, "navToServer('" + escapeHtml(folderPath) + "')");
-                });
-            }
-            entries.files.forEach(function(f) {
-                var isMine = (f.device_id === currentDeviceName);
-                var displayName = searchQuery ? f.rel_path : f.rel_path.substring(serverCurrentPath.length);
-                html += renderServerCard(f, localMap, f.device_id, isMine, displayName);
-            });
-            if (entries.folders.length === 0 && entries.files.length === 0) {
-                if (searchQuery) {
-                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">No files matching &ldquo;' + escapeHtml(searchQuery) + '&rdquo;</div>';
-                } else {
-                    html += '<div class="col-span-full py-6 text-center text-[#556] text-[13px]">This folder is empty</div>';
-                }
-            }
-            html += '</div>';
-            return html;
-        }
-
-        function renderFileLists(clientFiles, serverFiles) {
-            // Cache raw data for re-rendering during navigation
-            cachedClientFiles = clientFiles;
-            cachedServerFiles = serverFiles;
-
-            // Build maps keyed by rel_path
-            cachedLocalMap = {};
-            clientFiles.forEach(function(f) { cachedLocalMap[f.rel_path] = f; });
-            cachedServerMap = {};
-            serverFiles.forEach(function(f) { cachedServerMap[f.rel_path] = f; });
-
-            rerenderLocal();
-            rerenderServer();
-        }
-
-        // ---- file list refresh ----
-
-        async function refreshFileLists() {
-            // Reset navigation to root on refresh (after sync/push/pull/delete)
-            localCurrentPath = '';
-            serverCurrentPath = '';
-            document.getElementById('local-breadcrumb').innerHTML = '';
-            document.getElementById('local-file-list').innerHTML = loadingHtml();
-            document.getElementById('server-file-list').innerHTML = loadingHtml();
-            hideErrorBanner();
-            try {
-                var results = await Promise.all([
-                    fetch('/api/files/client').then(function(r) { return r.json(); }),
-                    fetch('/api/files/server').then(function(r) { return r.json(); })
-                ]);
-                var clientFiles = (results[0].files || []).slice().sort(function(a, b) {
-                    return a.rel_path < b.rel_path ? -1 : a.rel_path > b.rel_path ? 1 : 0;
-                });
-                var serverFiles = (results[1].files || []).slice().sort(function(a, b) {
-                    return a.rel_path < b.rel_path ? -1 : a.rel_path > b.rel_path ? 1 : 0;
-                });
-                renderFileLists(clientFiles, serverFiles);
-            } catch (e) {
-                showErrorBanner('Failed to load file lists. Check server connection.');
-            }
-        }
-
-        // ---- status polling ----
-
-        function updateStatus(data) {
-            if (data.device_name) currentDeviceName = data.device_name;
-
-            // Header connection dot
-            var connDot = document.getElementById('conn-dot');
-            var connText = document.getElementById('conn-text');
-            if (data.connected) {
-                connDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
-            } else {
-                connDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]';
-            }
-            connText.textContent = data.connected ? 'Connected' : 'Disconnected';
-
-            // Status card: connection
-            var scDot = document.getElementById('status-conn-dot');
-            var scText = document.getElementById('status-conn-text');
-            if (data.connected) {
-                scDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
-            } else {
-                scDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f24c4c] shadow-[0_0_6px_#f24c4c88]';
-            }
-            scText.textContent = data.connected ? 'Connected' : 'Disconnected';
-
-            // Status card: sync status
-            var syncDot = document.getElementById('sync-dot');
-            var syncText = document.getElementById('sync-text');
-            if (data.syncing) {
-                syncDot.className = 'inline-block w-2 h-2 rounded-full bg-[#f0c040] shadow-[0_0_6px_#f0c04088]';
-                syncText.textContent = 'Syncing...';
-            } else {
-                syncDot.className = 'inline-block w-2 h-2 rounded-full bg-[#00d26a] shadow-[0_0_6px_#00d26a88]';
-                syncText.textContent = 'Idle';
-            }
-
-            // Storage stats
-            document.getElementById('total-files').textContent = data.total_files;
-            document.getElementById('total-size').textContent = formatSize(data.total_size);
-
-            // Last sync
-            var lastTime = document.getElementById('last-sync-time');
-            var lastDetail = document.getElementById('last-sync-detail');
-            if (data.last_sync_time && data.last_sync_time !== '0001-01-01T00:00:00Z') {
-                lastTime.textContent = timeAgo(data.last_sync_time);
-                lastDetail.textContent =
-                    '\u2191' + data.last_sync_uploaded +
-                    ' \u2193' + data.last_sync_downloaded +
-                    ' \u2717' + data.last_sync_deleted;
-            } else {
-                lastTime.textContent = 'Never';
-                lastDetail.textContent = '';
-            }
-
-            // Error banner
-            var banner = document.getElementById('error-banner');
-            if (data.last_sync_error) {
-                banner.textContent = data.last_sync_error;
-                banner.classList.remove('hidden');
-            } else {
-                banner.classList.add('hidden');
-            }
-
-            // Full sync button: disabled while syncing
-            document.getElementById('sync-btn').disabled = data.syncing;
-
-            // Activity log
-            var log = document.getElementById('activity-log');
-            if (!data.activities || data.activities.length === 0) {
-                log.innerHTML = '<div class="py-8 px-6 text-center text-[#556] text-[13px]">No activity yet</div>';
-            } else {
-                log.innerHTML = data.activities.map(function(a) {
-                    return '<div class="px-4 py-2 border-b border-[#1e2a4a] last:border-b-0 flex gap-3 text-xs">' +
-                        '<span class="text-[#555] font-mono text-[11px] whitespace-nowrap min-w-[80px]">' + formatTime(a.time) + '</span>' +
-                        '<span class="font-mono text-[11px] text-[#aaa]">' + escapeHtml(a.message) + '</span>' +
-                        '</div>';
-                }).join('');
-            }
-
-            // Header chrome updates
-            document.getElementById('header-file-count').textContent = data.total_files + ' files';
-            document.getElementById('header-total-size').textContent = formatSize(data.total_size);
-            if (data.last_sync_time && data.last_sync_time !== '0001-01-01T00:00:00Z') {
-                document.getElementById('header-last-sync').textContent = 'Synced ' + timeAgo(data.last_sync_time);
-            } else {
-                document.getElementById('header-last-sync').textContent = 'Never synced';
-            }
-            if (data.device_name) {
-                document.getElementById('sidebar-device-name').textContent = data.device_name;
-            }
-        }
-
-        async function fetchStatus() {
-            try {
-                var resp = await fetch('/api/status');
-                if (!resp.ok) {
-                    showErrorBanner('Unable to reach server. Check connection.');
-                    return;
-                }
-                var data = await resp.json();
-                hideErrorBanner();
-                updateStatus(data);
-            } catch (e) {
-                showErrorBanner('Unable to reach server. Check connection.');
-            }
-        }
-
-        // ---- per-file operations ----
-
-        // Show inline feedback on the card containing the clicked button.
-        // If the button is not inside a data-card (e.g. FAB), show a temporary
-        // floating label above the button instead.
-        function showFeedback(btn, msg, isError) {
-            var card = btn.closest('[data-card]');
-            if (!card) {
-                // FAB / standalone button: show a floating label
-                var existing = btn.parentElement && btn.parentElement.querySelector('[data-feedback]');
-                if (existing) existing.remove();
-                var span = document.createElement('span');
-                span.style.cssText = 'position:fixed;bottom:90px;right:16px;z-index:200;padding:4px 10px;border-radius:6px;font-size:11px;white-space:nowrap;pointer-events:none;';
-                span.style.background = isError ? '#3a1c1c' : '#0d2e1c';
-                span.style.color = isError ? '#f24c4c' : '#00d26a';
-                span.style.border = isError ? '1px solid #f24c4c44' : '1px solid #00d26a44';
-                span.textContent = msg;
-                span.dataset.feedback = 'true';
-                document.body.appendChild(span);
-                setTimeout(function() { if (span.parentNode) span.remove(); }, 3000);
-                return;
-            }
-            var existing = card.querySelector('[data-feedback]');
-            if (existing) existing.remove();
-            var span = document.createElement('span');
-            span.className = isError ? 'text-[11px] text-[#f24c4c] py-0.5' : 'text-[11px] text-[#00d26a] py-0.5';
-            span.textContent = msg;
-            span.dataset.feedback = 'true';
-            var actions = btn.parentElement;
-            if (actions) actions.appendChild(span);
-            // Auto-remove after 3s
-            setTimeout(function() { if (span.parentNode) span.remove(); }, 3000);
-        }
-
-        async function doUpload(relPath, btn) {
-            if (operationInFlight) return;
-            operationInFlight = true;
-            var origText = btn.textContent;
-            btn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var resp = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), { method: 'POST' });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(btn, 'Pushed', false);
-                    await refreshFileLists();
-                    await fetchStatus();
-                } else {
-                    showFeedback(btn, data.message || 'Upload failed', true);
-                }
-            } catch (e) {
-                showFeedback(btn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                btn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        // Import one or more files via /api/files/import.
-        // Returns { ok: N, failed: N } counts.
-        async function importFiles(files) {
-            var subdir = localCurrentPath;
-            var baseUrl = '/api/files/import';
-            if (subdir) baseUrl += '?subdir=' + encodeURIComponent(subdir);
-            var ok = 0, failed = 0;
-            for (var i = 0; i < files.length; i++) {
-                var fd = new FormData();
-                fd.append('file', files[i]);
-                try {
-                    var resp = await fetch(baseUrl, { method: 'POST', body: fd });
-                    var data = await resp.json();
-                    if (data.ok) { ok++; } else { failed++; }
-                } catch (e) { failed++; }
-            }
-            await refreshFileLists();
-            await fetchStatus();
-            return { ok: ok, failed: failed };
-        }
-
-        async function handleFabFileSelect(input) {
-            var files = input.files;
-            if (!files.length) return;
-            input.value = '';
-            var fabBtn = document.getElementById('fab-btn');
-            if (operationInFlight) return;
-            operationInFlight = true;
-            var origText = fabBtn.textContent;
-            fabBtn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var result = await importFiles(files);
-                if (result.failed === 0) {
-                    showFeedback(fabBtn, result.ok === 1 ? 'Imported' : result.ok + ' imported', false);
-                } else {
-                    showFeedback(fabBtn, result.failed + ' failed', true);
-                }
-            } catch (e) {
-                showFeedback(fabBtn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                fabBtn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        // ---- drag-and-drop (desktop) ----
-        var dragCounter = 0;
-        var dropOverlay = null;
-
-        function initDragDrop() {
-            dropOverlay = document.getElementById('drop-overlay');
-
-            document.addEventListener('dragenter', function(e) {
-                e.preventDefault();
-                dragCounter++;
-                if (dragCounter === 1) {
-                    dropOverlay.classList.remove('hidden');
-                    dropOverlay.classList.add('flex');
-                    dropOverlay.style.pointerEvents = 'auto';
-                }
-            });
-
-            document.addEventListener('dragleave', function(e) {
-                e.preventDefault();
-                dragCounter--;
-                if (dragCounter <= 0) {
-                    dragCounter = 0;
-                    hideDropOverlay();
-                }
-            });
-
-            document.addEventListener('dragover', function(e) {
-                e.preventDefault();
-            });
-
-            document.addEventListener('drop', function(e) {
-                e.preventDefault();
-                dragCounter = 0;
-                hideDropOverlay();
-
-                var files = e.dataTransfer.files;
-                if (!files.length || operationInFlight) return;
-                operationInFlight = true;
-                setButtonsDisabled(true);
-
-                importFiles(files).then(function(result) {
-                    if (result.failed > 0) {
-                        showErrorBanner(result.failed + ' of ' + (result.ok + result.failed) + ' file(s) failed to import');
-                    }
-                }).finally(function() {
-                    operationInFlight = false;
-                    setButtonsDisabled(false);
-                });
-            });
-        }
-
-        function hideDropOverlay() {
-            dropOverlay.classList.add('hidden');
-            dropOverlay.classList.remove('flex');
-            dropOverlay.style.pointerEvents = 'none';
-        }
-
-        async function doDownload(relPath, btn) {
-            if (operationInFlight) return;
-            operationInFlight = true;
-            var origText = btn.textContent;
-            btn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var resp = await fetch('/api/files/download?path=' + encodeURIComponent(relPath), { method: 'POST' });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(btn, 'Pulled', false);
-                    await refreshFileLists();
-                    await fetchStatus();
-                } else {
-                    showFeedback(btn, data.message || 'Download failed', true);
-                }
-            } catch (e) {
-                showFeedback(btn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                btn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        async function doDevicePull(relPath, device, btn) {
-            if (operationInFlight) return;
-            operationInFlight = true;
-            var origText = btn.textContent;
-            btn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var resp = await fetch('/api/files/pull?path=' + encodeURIComponent(relPath) + '&from=' + encodeURIComponent(device), { method: 'POST' });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(btn, 'Pulled', false);
-                    await refreshFileLists();
-                    await fetchStatus();
-                } else {
-                    showFeedback(btn, data.message || 'Pull failed', true);
-                }
-            } catch (e) {
-                showFeedback(btn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                btn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        async function doDeleteServer(relPath, btn) {
-            if (operationInFlight) return;
-            if (!confirm('Delete "' + relPath + '" from server and local disk? Other devices\' copies are not affected.')) return;
-            operationInFlight = true;
-            var origText = btn.textContent;
-            btn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var resp = await fetch('/api/files/server?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(btn, 'Deleted', false);
-                    await refreshFileLists();
-                    await fetchStatus();
-                } else {
-                    showFeedback(btn, data.message || 'Delete failed', true);
-                }
-            } catch (e) {
-                showFeedback(btn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                btn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        async function doDeleteClient(relPath, btn) {
-            if (operationInFlight) return;
-            if (!confirm('Delete "' + relPath + '" from local storage?')) return;
-            operationInFlight = true;
-            var origText = btn.textContent;
-            btn.textContent = '...';
-            setButtonsDisabled(true);
-            try {
-                var resp = await fetch('/api/files/client?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
-                var data = await resp.json();
-                if (data.ok) {
-                    showFeedback(btn, 'Deleted', false);
-                    await refreshFileLists();
-                    await fetchStatus();
-                } else {
-                    showFeedback(btn, data.message || 'Delete failed', true);
-                }
-            } catch (e) {
-                showFeedback(btn, 'Network error', true);
-            } finally {
-                operationInFlight = false;
-                btn.textContent = origText;
-                setButtonsDisabled(false);
-            }
-        }
-
-        // ---- delegated click handler for file action buttons ----
-
-        document.addEventListener('click', function(e) {
-            var btn = e.target.closest('button[data-action]');
-            if (!btn) return;
-            var action = btn.dataset.action;
-            var path = btn.dataset.path;
-            switch (action) {
-                case 'upload':       doUpload(path, btn); break;
-                case 'download':     doDownload(path, btn); break;
-                case 'delete-client': doDeleteClient(path, btn); break;
-                case 'delete-server': doDeleteServer(path, btn); break;
-                case 'pull-device': doDevicePull(path, btn.dataset.device, btn); break;
-            }
-        });
-
-        // ---- force sync ----
-
-        async function forceSync() {
-            document.getElementById('sync-btn').disabled = true;
-            try {
-                await fetch('/api/force-sync', { method: 'POST' });
-                // Poll immediately to show syncing state, then refresh file lists
-                setTimeout(async function() {
-                    await fetchStatus();
-                    await refreshFileLists();
-                }, 500);
-            } catch (e) {
-                document.getElementById('sync-btn').disabled = false;
-                showErrorBanner('Sync failed. Check server connection.');
-            }
-        }
-
-        // ---- FAB bottom sheet ----
-
-        function buildFabModalList() {
-            var unsyncedFiles = cachedClientFiles.filter(function(f) {
-                var st = computeStatus(cachedLocalMap, cachedServerMap, f.rel_path);
-                return st === 'local-only' || st === 'conflict';
-            });
-            var list = document.getElementById('fab-modal-list');
-            if (unsyncedFiles.length === 0) {
-                list.innerHTML = '<div class="py-8 text-center text-[#556] text-sm">All local files are already synced</div>';
-            } else {
-                list.innerHTML = unsyncedFiles.map(function(f) {
-                    var safe = f.rel_path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                    return '<div class="flex items-center gap-3 px-2 py-2.5 rounded-lg active:bg-[#1a1a2e] cursor-pointer" onclick="fabPushFile(this,\'' + safe + '\')">' +
-                        '<span class="text-base shrink-0">' + fileIcon(f.rel_path) + '</span>' +
-                        '<span class="font-mono text-sm text-[#d0d8f0] flex-1 overflow-hidden text-ellipsis whitespace-nowrap">' + escapeHtml(f.rel_path) + '</span>' +
-                        '<span data-fab-status class="text-xs shrink-0 text-[#4d9eff]">Push \u2192</span>' +
-                        '</div>';
-                }).join('');
-            }
-        }
-
-        function openFabModal() {
-            buildFabModalList();
-            document.getElementById('fab-modal').classList.remove('hidden');
-        }
-
-        function closeFabModal() {
-            document.getElementById('fab-modal').classList.add('hidden');
-        }
-
-        function openFabImport() {
-            closeFabModal();
-            document.getElementById('fab-file-input').click();
-        }
-
-        async function fabPushFile(rowEl, relPath) {
-            if (operationInFlight) return;
-            operationInFlight = true;
-            setButtonsDisabled(true);
-            var statusEl = rowEl.querySelector('[data-fab-status]');
-            if (statusEl) statusEl.textContent = '...';
-            try {
-                var resp = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), { method: 'POST' });
-                var data = await resp.json();
-                if (data.ok) {
-                    if (statusEl) { statusEl.textContent = '\u2713'; statusEl.className = 'text-xs shrink-0 text-[#00d26a]'; }
-                    await refreshFileLists();
-                    await fetchStatus();
-                    buildFabModalList();
-                } else {
-                    if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'text-xs shrink-0 text-[#f24c4c]'; }
-                }
-            } catch (err) {
-                if (statusEl) { statusEl.textContent = 'Error'; statusEl.className = 'text-xs shrink-0 text-[#f24c4c]'; }
-            } finally {
-                operationInFlight = false;
-                setButtonsDisabled(false);
-            }
-        }
-
-        // ---- polling ----
-        // Status polling: lightweight, local HTTP only (no TCP to server)
-        // File list refresh: only on load and after operations (avoids TCP spam)
-
-        async function pollStatus() {
-            if (operationInFlight) return;
-            await fetchStatus();
-        }
-
-        // Initial load: fetch both status and file lists once
-        fetchStatus();
-        refreshFileLists();
-        initDragDrop();
-        // Only poll status on the timer -- file lists refresh after operations
-        setInterval(pollStatus, 5000);
-    </script>
+    <div class="avatar" id="user-avatar">MD</div>
+  </header>
+  <main id="app-main">
+    <div id="view-overview"><!-- Overview content: Plan 02 --></div>
+    <div id="view-files" style="display:none"><!-- Files content: Phase 2 --></div>
+  </main>
+
+  <script>
+    const TOTAL_BYTES = 250 * 1024 ** 3; // 250 GB cap — hardcoded per GLOB-05
+
+    const App = {
+      activeTab: 'overview',
+      filesPath: '',  // only reset on explicit Home breadcrumb click
+    };
+
+    function switchTab(tab) {
+      App.activeTab = tab;
+      document.querySelectorAll('.tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tab);
+      });
+      document.getElementById('view-overview').style.display = tab === 'overview' ? '' : 'none';
+      document.getElementById('view-files').style.display   = tab === 'files'    ? '' : 'none';
+    }
+  </script>
 </body>
 </html>
