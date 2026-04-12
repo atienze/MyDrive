@@ -274,7 +274,47 @@
     <div class="avatar" id="user-avatar">MD</div>
   </header>
   <main id="app-main">
-    <div id="view-overview"><!-- Overview content: Plan 02 --></div>
+    <div id="view-overview">
+      <!-- Donut chart -->
+      <div class="donut-wrap">
+        <svg class="donut-svg" width="200" height="200" viewBox="0 0 200 200" aria-label="Storage usage">
+          <circle class="donut-track" cx="100" cy="100" r="82"/>
+          <circle class="donut-used" id="donut-arc" cx="100" cy="100" r="82"
+                  stroke-dasharray="0 516" stroke-dashoffset="0"/>
+        </svg>
+        <div class="donut-label">
+          <div class="donut-free-value" id="donut-free-val">—</div>
+          <div class="donut-free-unit" id="donut-free-unit">free</div>
+        </div>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-label">Used</div>
+          <div class="stat-value" id="stat-used">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="stat-total">250 GB</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sync</div>
+          <div class="stat-value sync-ok" id="stat-sync">—</div>
+        </div>
+      </div>
+
+      <!-- Activity feed -->
+      <div class="activity-section">
+        <div class="activity-heading">Recent activity</div>
+        <div class="activity-list" id="activity-list">
+          <div class="activity-empty">No recent activity</div>
+        </div>
+      </div>
+
+      <!-- Browse files button -->
+      <button class="browse-btn" onclick="switchTab('files')">Browse files ↗</button>
+    </div>
     <div id="view-files" style="display:none"><!-- Files content: Phase 2 --></div>
   </main>
 
@@ -294,6 +334,140 @@
       document.getElementById('view-overview').style.display = tab === 'overview' ? '' : 'none';
       document.getElementById('view-files').style.display   = tab === 'files'    ? '' : 'none';
     }
+
+    const CIRCUMFERENCE = 2 * Math.PI * 82; // r=82 matches SVG circle
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(1024));
+      const v = bytes / Math.pow(1024, i);
+      return (i === 0 ? v.toFixed(0) : v.toFixed(1)) + ' ' + units[i];
+    }
+
+    function relTime(isoString) {
+      const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
+      if (diff < 60)  return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+      return Math.floor(diff / 86400) + ' d ago';
+    }
+
+    function activityBadge(message) {
+      // Classify from message text; return CSS class and short label
+      const m = message.toLowerCase();
+      if (m.includes('upload') || m.includes('push') || m.includes('sent')) return ['badge-up',   '↑'];
+      if (m.includes('download') || m.includes('pull') || m.includes('recv')) return ['badge-down', '↓'];
+      if (m.includes('delete') || m.includes('removed')) return ['badge-del', '✕'];
+      return ['badge-sync', '↻'];
+    }
+
+    // Parse a human-readable file size from an activity message string.
+    // /api/status activities have no size field — we attempt to extract a trailing
+    // size suffix (e.g. "1.2 MB", "512 KB") from the message text.
+    // Returns the size string if found, or "—" when unavailable.
+    function parseActivitySize(message) {
+      const m = (message || '').match(/(\d+(?:\.\d+)?\s*(?:B|KB|MB|GB|TB))\s*$/i);
+      return m ? m[1] : '—';
+    }
+
+    function renderOverview(snapshot, usedBytes) {
+      // Donut arc — ratio math using CIRCUMFERENCE constant
+      const ratio = Math.min(usedBytes / TOTAL_BYTES, 1);
+      const used  = ratio * CIRCUMFERENCE;
+      const free  = CIRCUMFERENCE - used;
+      const arc   = document.getElementById('donut-arc');
+      if (arc) arc.setAttribute('stroke-dasharray', used.toFixed(1) + ' ' + free.toFixed(1));
+
+      // Free space label inside ring
+      const freeBytes = Math.max(TOTAL_BYTES - usedBytes, 0);
+      const freeStr   = formatBytes(freeBytes);
+      const parts     = freeStr.split(' ');
+      const freeVal   = document.getElementById('donut-free-val');
+      const freeUnit  = document.getElementById('donut-free-unit');
+      if (freeVal)  freeVal.textContent  = parts[0];
+      if (freeUnit) freeUnit.textContent = (parts[1] || '') + ' free';
+
+      // Stat: Used
+      const statUsed = document.getElementById('stat-used');
+      if (statUsed) statUsed.textContent = formatBytes(usedBytes);
+
+      // Stat: Total (static but confirm via JS)
+      const statTotal = document.getElementById('stat-total');
+      if (statTotal) statTotal.textContent = formatBytes(TOTAL_BYTES);
+
+      // Stat: Sync
+      const statSync = document.getElementById('stat-sync');
+      if (statSync) {
+        const syncing = snapshot && snapshot.syncing;
+        statSync.textContent = syncing ? 'Syncing…' : 'Up to date';
+        statSync.className = 'stat-value ' + (syncing ? 'sync-busy' : 'sync-ok');
+      }
+
+      // Activity feed
+      const list = document.getElementById('activity-list');
+      if (!list) return;
+      const activities = (snapshot && snapshot.activities) || [];
+      if (activities.length === 0) {
+        list.innerHTML = '<div class="activity-empty">No recent activity</div>';
+        return;
+      }
+      list.innerHTML = activities.slice(0, 20).map(a => {
+        const [cls, icon] = activityBadge(a.message || '');
+        // Extract filename from message: last path segment or whole message
+        const match = (a.message || '').match(/([^\/\s]+\.\w+)\s*(?:\d+(?:\.\d+)?\s*(?:B|KB|MB|GB|TB))?\s*$/i);
+        const filename = match ? match[1] : (a.message || 'Activity');
+        const when = a.time ? relTime(a.time) : '';
+        // Size: /api/status activities have no size field; parse from message or show "—"
+        const size = parseActivitySize(a.message || '');
+        // NO hex literals — all styling via CSS classes
+        return '<div class="activity-row">' +
+          '<div class="activity-badge ' + cls + '">' + icon + '</div>' +
+          '<div class="activity-filename">' + escapeHtml(filename) + '</div>' +
+          '<div class="activity-meta">' +
+            '<span>' + escapeHtml(size) + '</span>' +
+            '<span>' + escapeHtml(when) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // Fixture files array — usedBytes derived via .reduce() to establish GLOB-05 pattern for Phase 3
+    // (Phase 3 will replace this with files.reduce() over live /api/files/server response)
+    const FIXTURE_FILES = [
+      { rel_path: 'notes/meeting.md',    size: 4096 },
+      { rel_path: 'photos/img001.jpg',   size: 3_200_000 },
+      { rel_path: 'backup/db.sqlite',    size: 512_000_000 },
+      { rel_path: 'docs/report.pdf',     size: 2_100_000 },
+      { rel_path: 'videos/demo.mp4',     size: 18_000_000_000 - 515_716_096 }, // fills to ~18.4 GB total
+    ];
+    const FIXTURE_USED_BYTES = FIXTURE_FILES.reduce((acc, f) => acc + f.size, 0);
+
+    // Fixture status snapshot — used until Phase 3 wires live API poll
+    const FIXTURE_SNAPSHOT = {
+      connected: true,
+      syncing: false,
+      last_sync_time: new Date(Date.now() - 7200000).toISOString(),
+      total_files: 42,
+      total_size: 0,
+      activities: [
+        { time: new Date(Date.now() - 600000).toISOString(),   message: 'Uploaded notes/meeting.md 4 KB' },
+        { time: new Date(Date.now() - 3600000).toISOString(),  message: 'Uploaded photos/img001.jpg 3.1 MB' },
+        { time: new Date(Date.now() - 7200000).toISOString(),  message: 'Downloaded backup/db.sqlite 512 MB' },
+        { time: new Date(Date.now() - 86400000).toISOString(), message: 'Deleted tmp/scratch.txt' },
+      ],
+    };
+
+    // Boot: render overview with fixture data immediately
+    renderOverview(FIXTURE_SNAPSHOT, FIXTURE_USED_BYTES);
   </script>
 </body>
 </html>
