@@ -1124,6 +1124,40 @@
       }
     }
 
+    // ---- Local file actions (LOCAL-03, LOCAL-04) ----
+
+    async function pushFile(relPath) {
+      try {
+        const res = await fetch('/api/files/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath }),
+        });
+        if (!res.ok) throw new Error('upload failed: ' + res.status);
+        // Re-fetch both client and server maps so sync dot updates correctly
+        await refreshData();
+        // If server data was previously loaded, refresh it too so server view stays consistent
+        if (App.serverLoaded) await loadServerViewData();
+      } catch (err) {
+        showErrorBanner('Push failed: ' + err.message);
+      }
+    }
+
+    async function deleteLocalFile(relPath) {
+      if (!confirm('Delete "' + relPath + '" from your local machine?\nThis cannot be undone.')) return;
+      try {
+        const res = await fetch('/api/files/client', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath }),
+        });
+        if (!res.ok) throw new Error('delete failed: ' + res.status);
+        await refreshData();
+      } catch (err) {
+        showErrorBanner('Delete failed: ' + err.message);
+      }
+    }
+
     async function refreshData() {
       try {
         const [statusRes, clientRes] = await Promise.all([
