@@ -15,8 +15,8 @@
 
 - [x] **LOCAL-01**: User can browse local machine files with folder navigation and breadcrumb
 - [x] **LOCAL-02**: Each local file row shows sync status (synced / unsynced dot)
-- [ ] **LOCAL-03**: User can push a single local file to the server via a per-row action button
-- [ ] **LOCAL-04**: User can delete a single local file via a per-row action button (with confirmation)
+- [x] **LOCAL-03**: User can push a single local file to the server via a per-row action button
+- [x] **LOCAL-04**: User can delete a single local file via a per-row action button (with confirmation)
 - [x] **LOCAL-05**: Footer shows current directory item count and total size
 
 ### Server View
@@ -88,8 +88,8 @@
 | NAV-03 | Phase 1 | Complete |
 | LOCAL-01 | Phase 1 | Complete |
 | LOCAL-02 | Phase 1 | Complete |
-| LOCAL-03 | Phase 2 | Pending |
-| LOCAL-04 | Phase 2 | Pending |
+| LOCAL-03 | Phase 2 | Complete |
+| LOCAL-04 | Phase 2 | Complete |
 | LOCAL-05 | Phase 1 | Complete |
 | SERV-01 | Phase 1 | Complete |
 | SERV-02 | Phase 1 | Complete |
