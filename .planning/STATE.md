@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-views-01-PLAN.md
-last_updated: "2026-04-14T18:19:10.909Z"
+stopped_at: Completed 01-views-02-PLAN.md
+last_updated: "2026-04-14T18:22:31.314Z"
 last_activity: 2026-04-14 — Roadmap created; 3 phases derived from 31 v1 requirements
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 33
 ---
 
@@ -51,6 +51,7 @@ Progress: [███░░░░░░░] 33%
 
 *Updated after each plan completion*
 | Phase 01-views P01 | 8 | 2 tasks | 1 files |
+| Phase 01-views P02 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - [Phase 01-views]: Server file list is never auto-fetched; usedBytes for donut chart starts at 0 until user visits Server tab
 - [Phase 01-views]: Sync dots start amber; turn synced only after user loads Server view at least once
 - [Phase 01-views]: view-server placeholder div added in plan 01 so switchTab() works before plan 02 wires content
+- [Phase 01-views]: Device column omitted from Server view in Phase 1 — device_id display is Phase 2 scope
+- [Phase 01-views]: /api/files/server never called from refreshData() — strictly user-initiated via Refresh button
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T18:19:10.906Z
-Stopped at: Completed 01-views-01-PLAN.md
+Last session: 2026-04-14T18:22:31.311Z
+Stopped at: Completed 01-views-02-PLAN.md
 Resume file: None

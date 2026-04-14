@@ -21,14 +21,14 @@
 
 ### Server View
 
-- [ ] **SERV-01**: User can browse all files stored on the homelab server (the central file database) without triggering a full sync
-- [ ] **SERV-02**: Server view is populated from `/api/files/server` on demand (Refresh button, not auto-sync)
-- [ ] **SERV-03**: Server files not present on the local machine are visually distinguished (e.g. server-only indicator)
-- [ ] **SERV-04**: Server files that match a local file (same hash) are visually indicated as synced
+- [x] **SERV-01**: User can browse all files stored on the homelab server (the central file database) without triggering a full sync
+- [x] **SERV-02**: Server view is populated from `/api/files/server` on demand (Refresh button, not auto-sync)
+- [x] **SERV-03**: Server files not present on the local machine are visually distinguished (e.g. server-only indicator)
+- [x] **SERV-04**: Server files that match a local file (same hash) are visually indicated as synced
 - [ ] **SERV-05**: User can pull a single server file to local machine via a per-row action button
 - [ ] **SERV-06**: User can delete a single server file via a per-row action button (with confirmation)
-- [ ] **SERV-07**: Server view supports folder navigation and breadcrumb (same pattern as local view)
-- [ ] **SERV-08**: Server footer shows total file count and total size of visible files
+- [x] **SERV-07**: Server view supports folder navigation and breadcrumb (same pattern as local view)
+- [x] **SERV-08**: Server footer shows total file count and total size of visible files
 
 ### Bulk Select
 
@@ -91,14 +91,14 @@
 | LOCAL-03 | Phase 2 | Pending |
 | LOCAL-04 | Phase 2 | Pending |
 | LOCAL-05 | Phase 1 | Complete |
-| SERV-01 | Phase 1 | Pending |
-| SERV-02 | Phase 1 | Pending |
-| SERV-03 | Phase 1 | Pending |
-| SERV-04 | Phase 1 | Pending |
+| SERV-01 | Phase 1 | Complete |
+| SERV-02 | Phase 1 | Complete |
+| SERV-03 | Phase 1 | Complete |
+| SERV-04 | Phase 1 | Complete |
 | SERV-05 | Phase 2 | Pending |
 | SERV-06 | Phase 2 | Pending |
-| SERV-07 | Phase 1 | Pending |
-| SERV-08 | Phase 1 | Pending |
+| SERV-07 | Phase 1 | Complete |
+| SERV-08 | Phase 1 | Complete |
 | BULK-01 | Phase 3 | Pending |
 | BULK-02 | Phase 3 | Pending |
 | BULK-03 | Phase 3 | Pending |
