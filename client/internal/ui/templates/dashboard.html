@@ -387,6 +387,40 @@
     }
     .sync-dot.synced { background: var(--success); }
     .sync-dot.amber  { background: var(--warn); }
+    .sync-dot.server-only { background: var(--text-muted); }
+
+    #view-server {
+      padding: 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .server-view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    #server-breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex: 1;
+      min-width: 0;
+    }
+    #server-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      gap: 12px;
+    }
 
     /* ---- Files footer (FILE-05) ---- */
     #files-footer {
@@ -524,7 +558,25 @@
       <div id="files-footer"></div>
     </div>
     <div id="view-server" style="display:none">
-      <!-- Server view — wired in plan 02 -->
+      <div class="server-view-header">
+        <div id="server-breadcrumb" aria-label="Server path"></div>
+        <button class="footer-btn active" onclick="loadServerViewData()">Refresh</button>
+      </div>
+      <div class="files-table-wrap">
+        <table class="files-table" aria-label="Server files">
+          <thead>
+            <tr>
+              <th style="width:55%">Name</th>
+              <th style="width:20%">Size</th>
+              <th style="width:25%">Status</th>
+            </tr>
+          </thead>
+          <tbody id="server-tbody">
+            <tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">Click Refresh to load server files</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="server-footer"></div>
     </div>
   </main>
 
