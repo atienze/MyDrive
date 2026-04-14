@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 Phase: 1 of 3 (Views)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-04-14 — Roadmap created; 3 phases derived from 31 v1 requirements
+Last activity: 2026-04-14 - Completed quick task 1: Fix push/pull button functionality in local and server file tabs
 
 Progress: [███░░░░░░░] 33%
 
@@ -86,8 +86,15 @@ None yet.
 
 None yet.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Fix push/pull button functionality in local and server file tabs | 2026-04-14 | 13deca9 | [1-fix-push-pull-button-functionality-in-lo](./quick/1-fix-push-pull-button-functionality-in-lo/) |
+| 2 | Fix sync dot not turning green after push (renderFilesTable after loadServerViewData) | 2026-04-14 | fa456be | [2-fix-sync-status-indicators-not-updating-](./quick/2-fix-sync-status-indicators-not-updating-/) |
+
 ## Session Continuity
 
 Last session: 2026-04-14T21:07:52.326Z
-Stopped at: Completed quick-1-01-PLAN.md
+Stopped at: Completed quick-2-01-PLAN.md
 Resume file: None
