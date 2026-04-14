@@ -1,94 +1,125 @@
-# Requirements: myDrive Dashboard UI Redesign
+# Requirements: myDrive Dashboard Overhaul
 
-**Defined:** 2026-04-12
-**Core Value:** A homelab user can glance at storage usage and recent sync activity, then browse and manage files — all from a single polished page that feels like a real cloud drive dashboard.
+**Defined:** 2026-04-14
+**Core Value:** Users can see everything stored on the server and on their local machine — and act on individual files or bulk selections — without triggering a full sync.
 
 ## v1 Requirements
 
-### Overview View
+### Navigation
 
-- [x] **OVR-01**: SVG donut ring chart centered on page shows used vs free storage; free space value displayed inside the ring; used arc renders in blue; track fills from 12 o'clock position
-- [x] **OVR-02**: Three inline stat cards below the donut — Used (formatted size), Total (250 GB), Sync status (green "Up to date" / amber "Syncing..." colored text)
-- [x] **OVR-03**: Recent activity feed below stat cards; each row shows upload/download icon badge, filename, relative timestamp (e.g. "2 hours ago"), and file size
-- [x] **OVR-04**: "Browse files ↗" button at bottom of overview switches to Files view
+- [x] **NAV-01**: User can switch between Overview, Local Files, and Server tabs from the header
+- [x] **NAV-02**: Active tab is visually indicated and persists across data refreshes
+- [x] **NAV-03**: Tab bar is touch-friendly on mobile (adequate tap target height)
 
-### Files View
+### Local Files View
 
-- [x] **FILE-01**: Breadcrumb path bar at top shows current directory path (e.g. `/ home / documents`); each segment is clickable and navigates to that path level
-- [x] **FILE-02**: File table with four columns — Name (colored extension badge + filename), Modified (formatted date/time), Size (formatted), Sync (status dot)
-- [x] **FILE-03**: Folders listed before files; folder rows show `—` for Modified and Size; synthetic folder entries reconstructed client-side from flat `rel_path` strings
-- [x] **FILE-04**: Table rows highlight on hover; 0.5px border-bottom dividers between rows; table container has 6px border-radius with 0.5px border
-- [x] **FILE-05**: Footer bar shows item count + total size on left; Upload and New Folder buttons on right (present but non-functional stubs in v1)
-- [x] **FILE-06**: Sync status dot — green if file exists on both client and server with matching hash; amber if pending/mismatched; derived by comparing `/api/files/server` and `/api/files/client` responses
+- [x] **LOCAL-01**: User can browse local machine files with folder navigation and breadcrumb
+- [x] **LOCAL-02**: Each local file row shows sync status (synced / unsynced dot)
+- [ ] **LOCAL-03**: User can push a single local file to the server via a per-row action button
+- [ ] **LOCAL-04**: User can delete a single local file via a per-row action button (with confirmation)
+- [x] **LOCAL-05**: Footer shows current directory item count and total size
 
-### Global Layout
+### Server View
 
-- [x] **GLOB-01**: Persistent header bar — app triangle logo + "myDrive" name on left; Overview and Files nav tabs in center-right area; user avatar circle (initials) on far right
-- [x] **GLOB-02**: Active nav tab shows 2px underline in accent color; clicking a tab switches the active view; inactive tab has no underline and uses muted text color
-- [x] **GLOB-03**: Light/dark mode via CSS custom properties at `:root`; one `@media (prefers-color-scheme: dark)` block overrides token values; no JS, no runtime toggle, no flash-of-wrong-theme
-- [ ] **GLOB-04**: All data fetched from existing Go API endpoints (`/api/status`, `/api/files/server`, `/api/files/client`); 10-second poll loop with `Promise.all`; error banner displayed if server unreachable
-- [x] **GLOB-05**: Storage calculation: sum of `size` fields from `/api/files/server` response = used bytes; `TOTAL_BYTES = 250 * 1024 ** 3` JS constant; free = total − used
-- [x] **GLOB-06**: File-type extension badges: small colored pill with abbreviated extension text (e.g. green `{}` for yml/yaml, blue `M` for md, grey `◇` for unknown); no CDN icon library; inline only
-- [x] **GLOB-07**: Flat aesthetic — no box shadows, no gradients; 0.5px borders (`rgba(0,0,0,0.08)`); generous whitespace; system font stack
+- [ ] **SERV-01**: User can browse all files stored on the homelab server (the central file database) without triggering a full sync
+- [ ] **SERV-02**: Server view is populated from `/api/files/server` on demand (Refresh button, not auto-sync)
+- [ ] **SERV-03**: Server files not present on the local machine are visually distinguished (e.g. server-only indicator)
+- [ ] **SERV-04**: Server files that match a local file (same hash) are visually indicated as synced
+- [ ] **SERV-05**: User can pull a single server file to local machine via a per-row action button
+- [ ] **SERV-06**: User can delete a single server file via a per-row action button (with confirmation)
+- [ ] **SERV-07**: Server view supports folder navigation and breadcrumb (same pattern as local view)
+- [ ] **SERV-08**: Server footer shows total file count and total size of visible files
+
+### Bulk Select
+
+- [ ] **BULK-01**: User can enter bulk-select mode in Local Files view (checkbox column or select-all toggle)
+- [ ] **BULK-02**: User can enter bulk-select mode in Server view
+- [ ] **BULK-03**: User can select individual files via checkbox; select-all toggles all visible rows
+- [ ] **BULK-04**: Bulk action bar appears when one or more items are selected, showing available actions and selection count
+- [ ] **BULK-05**: User can bulk push selected local files to server
+- [ ] **BULK-06**: User can bulk pull selected server files to local machine
+- [ ] **BULK-07**: User can bulk delete selected server files (with confirmation showing count)
+- [ ] **BULK-08**: User can bulk delete selected local files (with confirmation showing count)
+- [ ] **BULK-09**: Bulk-select mode is cancelled when user switches tabs or navigates to a subfolder
+
+### Layout & Accessibility
+
+- [ ] **A11Y-01**: All interactive elements have minimum 44×44px touch target on mobile
+- [ ] **A11Y-02**: File tables scroll horizontally on small screens rather than overflowing/clipping
+- [ ] **A11Y-03**: Action buttons in file rows are visible on hover (desktop) and always visible on mobile
+- [ ] **A11Y-04**: Bulk action bar is fixed/sticky so it remains visible when scrolling a long file list
+- [ ] **A11Y-05**: Minimal theme is maintained — no decorative color, consistent with existing CSS variable system
+- [ ] **A11Y-06**: Dark mode support is maintained for all new UI elements
 
 ## v2 Requirements
 
-### Interactivity
+### Enhanced Server View
 
-- **ACT-01**: Upload button wired to `POST /api/files/upload` with file picker
-- **ACT-02**: New Folder button creates a local directory via a new API endpoint
-- **ACT-03**: File row "Remove from server" action via `DELETE /api/files/server`
-- **ACT-04**: File row "Delete local" action via `DELETE /api/files/client`
-- **ACT-05**: Force sync button wired to `POST /api/force-sync`
+- **SERV-V2-01**: Cross-device pull — pull a file from a specific device (uses `/api/files/pull?from=<deviceID>`)
+- **SERV-V2-02**: Per-device storage breakdown in Overview donut chart
+- **SERV-V2-03**: Search/filter within server view
 
-### UX Enhancements
+### Enhanced Local View
 
-- **UX-01**: Table column sort (click column header to sort by Name/Modified/Size)
-- **UX-02**: Search/filter bar in Files view
-- **UX-03**: Mobile responsive layout (bottom nav bar, stacked views)
-- **UX-04**: Runtime light/dark mode toggle button
+- **LOCAL-V2-01**: Drag-and-drop file import to push files into sync dir
+- **LOCAL-V2-02**: Upload from device file picker (mobile)
+
+### Sync & Status
+
+- **SYNC-V2-01**: Modified timestamp column when API provides it
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| React / Tailwind / any build tooling | No npm in repo; Go embed requires single file; complexity not justified |
-| Server-side changes (new Go endpoints) | Project constraint — no modifications to handler.go, db.go, or server |
-| File preview (images, PDF, text) | Complexity; not core to homelab sync dashboard |
-| Multi-file bulk operations | Out of scope for v1; single-file actions only |
-| User authentication on the UI | Wrong layer — the Go server already handles token auth at TCP level |
-| Filesystem watcher / push updates | Requires WebSocket or SSE; polling sufficient for homelab use |
-| Upload progress bar | Requires server-side streaming changes |
+| New backend Go endpoints | All operations map to existing `/api/files/*` endpoints; avoids Go changes |
+| Real-time filesystem watch | Sync is intentionally manual/on-demand by design |
+| Auth / login UI | Handled at TCP layer, not the web UI |
+| Mobile native app | Web-first; dashboard runs in mobile browser |
+| Folder create / rename | Server is content-addressable; folder structure is implicit in rel_path |
+| Conflict resolution UI | Client-wins is the design; no manual merge needed |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GLOB-01 | Phase 1 | Complete |
-| GLOB-02 | Phase 1 | Complete |
-| GLOB-03 | Phase 1 | Complete |
-| GLOB-05 | Phase 1 | Complete |
-| GLOB-07 | Phase 1 | Complete |
-| OVR-01 | Phase 1 | Complete |
-| OVR-02 | Phase 1 | Complete |
-| OVR-03 | Phase 1 | Complete |
-| OVR-04 | Phase 1 | Complete |
-| FILE-01 | Phase 2 | Complete |
-| FILE-02 | Phase 2 | Complete |
-| FILE-03 | Phase 2 | Complete |
-| FILE-04 | Phase 2 | Complete |
-| FILE-05 | Phase 2 | Complete |
-| FILE-06 | Phase 2 | Complete |
-| GLOB-06 | Phase 2 | Complete |
-| GLOB-04 | Phase 3 | Pending |
+| NAV-01 | Phase 1 | Complete |
+| NAV-02 | Phase 1 | Complete |
+| NAV-03 | Phase 1 | Complete |
+| LOCAL-01 | Phase 1 | Complete |
+| LOCAL-02 | Phase 1 | Complete |
+| LOCAL-03 | Phase 2 | Pending |
+| LOCAL-04 | Phase 2 | Pending |
+| LOCAL-05 | Phase 1 | Complete |
+| SERV-01 | Phase 1 | Pending |
+| SERV-02 | Phase 1 | Pending |
+| SERV-03 | Phase 1 | Pending |
+| SERV-04 | Phase 1 | Pending |
+| SERV-05 | Phase 2 | Pending |
+| SERV-06 | Phase 2 | Pending |
+| SERV-07 | Phase 1 | Pending |
+| SERV-08 | Phase 1 | Pending |
+| BULK-01 | Phase 3 | Pending |
+| BULK-02 | Phase 3 | Pending |
+| BULK-03 | Phase 3 | Pending |
+| BULK-04 | Phase 3 | Pending |
+| BULK-05 | Phase 3 | Pending |
+| BULK-06 | Phase 3 | Pending |
+| BULK-07 | Phase 3 | Pending |
+| BULK-08 | Phase 3 | Pending |
+| BULK-09 | Phase 3 | Pending |
+| A11Y-01 | Phase 1 | Pending |
+| A11Y-02 | Phase 1 | Pending |
+| A11Y-03 | Phase 2 | Pending |
+| A11Y-04 | Phase 3 | Pending |
+| A11Y-05 | Phase 1 | Pending |
+| A11Y-06 | Phase 1 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17
-- Unmapped: 0 ✓
+- v1 requirements: 31 total
+- Mapped to phases: 31
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-04-12*
-*Last updated: 2026-04-12 after roadmap creation*
+*Requirements defined: 2026-04-14*
+*Last updated: 2026-04-14 after roadmap creation*
