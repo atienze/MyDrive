@@ -62,7 +62,12 @@ Plans:
   3. Selected local files can be bulk-pushed to server; selected server files can be bulk-pulled to local machine
   4. Selected server files can be bulk-deleted; selected local files can be bulk-deleted; both require a confirmation that shows the count of affected files
   5. Bulk-select mode is cleared automatically when the user switches tabs or navigates into a subfolder
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Bulk-bar CSS/HTML structure, App.bulkMode state, enterBulkMode/clearBulkMode, navigation hooks
+- [ ] 03-02-PLAN.md — Checkbox column injection into both render functions, handleRowCheck/handleSelectAll/updateBulkBar
+- [ ] 03-03-PLAN.md — bulkPush/bulkPull/bulkDeleteLocal/bulkDeleteServer + human verification
 
 ## Progress
 
@@ -73,4 +78,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Views | 3/3 | Complete   | 2026-04-14 |
 | 2. Individual Actions | 0/3 | Not started | - |
-| 3. Bulk Select | 0/TBD | Not started | - |
+| 3. Bulk Select | 0/3 | Not started | - |

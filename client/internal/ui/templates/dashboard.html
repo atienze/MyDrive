@@ -522,6 +522,32 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+
+    /* ---- Bulk select mode (Phase 3) ---- */
+    .bulk-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--bg-surface);
+      border-top: var(--border-width) solid var(--border);
+      padding: 10px 14px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      z-index: 5;
+    }
+    .bulk-bar.visible {
+      display: flex;
+    }
+    .bulk-count {
+      font-size: 13px;
+      color: var(--text-secondary);
+      flex: 1;
+      min-width: 0;
+    }
+    /* Checkbox column th: hidden when not in bulk mode */
+    .files-table:not(.bulk-active) .th-bulk { display: none; }
+    /* Checkbox column td: hidden when not in bulk mode */
+    .files-table:not(.bulk-active) .td-bulk { display: none; }
   </style>
 </head>
 <body>
@@ -590,8 +616,11 @@
       <button class="browse-btn" onclick="switchTab('local')">Browse files ↗</button>
     </div>
     <div id="view-local" style="display:none">
-      <!-- Breadcrumb path bar (FILE-01) -->
-      <div id="files-breadcrumb" aria-label="Current path"></div>
+      <!-- Breadcrumb + bulk-select trigger -->
+      <div class="server-view-header">
+        <div id="files-breadcrumb" aria-label="Current path" style="flex:1;min-width:0"></div>
+        <button class="footer-btn active" id="local-select-btn" onclick="enterBulkMode('local')">Select</button>
+      </div>
 
       <!-- File table (FILE-02, FILE-03, FILE-04) -->
       <div class="files-table-wrap">
@@ -611,12 +640,19 @@
         </table>
       </div>
 
-      <!-- Footer bar: Plan 02 adds this -->
+      <!-- Bulk action bar (BULK-04, A11Y-04): visible only when items selected -->
+      <div id="local-bulk-bar" class="bulk-bar" role="toolbar" aria-label="Bulk actions">
+        <span class="bulk-count" id="local-bulk-count">0 selected</span>
+        <button class="action-btn" onclick="bulkPush()">Push</button>
+        <button class="action-btn danger" onclick="bulkDeleteLocal()">Delete</button>
+        <button class="footer-btn active" onclick="clearBulkMode('local')">Cancel</button>
+      </div>
       <div id="files-footer"></div>
     </div>
     <div id="view-server" style="display:none">
       <div class="server-view-header">
         <div id="server-breadcrumb" aria-label="Server path"></div>
+        <button class="footer-btn active" id="server-select-btn" onclick="enterBulkMode('server')">Select</button>
         <button class="footer-btn active" onclick="loadServerViewData()">Refresh</button>
       </div>
       <div class="files-table-wrap">
@@ -634,6 +670,13 @@
           </tbody>
         </table>
       </div>
+      <!-- Bulk action bar for server view (BULK-04, A11Y-04) -->
+      <div id="server-bulk-bar" class="bulk-bar" role="toolbar" aria-label="Bulk actions">
+        <span class="bulk-count" id="server-bulk-count">0 selected</span>
+        <button class="action-btn" onclick="bulkPull()">Pull</button>
+        <button class="action-btn danger" onclick="bulkDeleteServer()">Delete</button>
+        <button class="footer-btn active" onclick="clearBulkMode('server')">Cancel</button>
+      </div>
       <div id="server-footer"></div>
     </div>
   </main>
@@ -650,9 +693,17 @@
       cachedServerFiles: [],             // set by Plan 02 for sync dot computation
       cachedClientMap: Object.create(null), // keyed by rel_path for O(1) sync checks
       cachedServerMap: Object.create(null), // keyed by rel_path for O(1) sync checks
+      bulkMode: {
+        localActive:    false,
+        serverActive:   false,
+        localSelected:  new Set(),   // rel_path strings for local selection
+        serverSelected: new Set(),   // rel_path strings for server selection
+      },
     };
 
     function switchTab(tab) {
+      clearBulkMode('local');
+      clearBulkMode('server');
       App.activeTab = tab;
       document.querySelectorAll('.tab').forEach(el => {
         el.classList.toggle('active', el.dataset.tab === tab);
@@ -846,6 +897,7 @@
     // Only call this from user interaction (folder click, breadcrumb click).
     // Do NOT call from data refresh — refreshes must preserve App.filesPath.
     function filesNavTo(path) {
+      clearBulkMode('local');
       App.filesPath = path;
       renderBreadcrumb();
       renderFilesTable();
@@ -1039,6 +1091,7 @@
     // ---- Navigate to a path in the Server view ----
     // Mirrors filesNavTo() but for App.serverPath. Only called from user interaction.
     function serverNavTo(path) {
+      clearBulkMode('server');
       App.serverPath = path;
       renderServerBreadcrumb();
       renderServerTable();
@@ -1134,6 +1187,36 @@
           tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">Failed to load. Click Refresh to retry.</td></tr>';
         }
       }
+    }
+
+    // ---- Bulk select mode (BULK-01, BULK-02, BULK-09) ----
+
+    function enterBulkMode(view) {
+      App.bulkMode[view + 'Active'] = true;
+      App.bulkMode[view + 'Selected'].clear();
+      // Toggle Select button: disable it while in bulk mode to prevent double-entry
+      const selectBtn = document.getElementById(view + '-select-btn');
+      if (selectBtn) { selectBtn.disabled = true; selectBtn.style.opacity = '0.5'; }
+      if (view === 'local') renderFilesTable();
+      else                  renderServerTable();
+    }
+
+    function clearBulkMode(view) {
+      App.bulkMode[view + 'Active'] = false;
+      App.bulkMode[view + 'Selected'].clear();
+      // Re-enable the Select button
+      const selectBtn = document.getElementById(view + '-select-btn');
+      if (selectBtn) { selectBtn.disabled = false; selectBtn.style.opacity = ''; }
+      // Hide bulk bar
+      const bar = document.getElementById(view + '-bulk-bar');
+      if (bar) bar.classList.remove('visible');
+      // Remove bulk-active class from table
+      const table = document.querySelector(
+        view === 'local' ? '#view-local .files-table' : '#view-server .files-table'
+      );
+      if (table) table.classList.remove('bulk-active');
+      if (view === 'local') renderFilesTable();
+      else                  renderServerTable();
     }
 
     // ---- Local file actions (LOCAL-03, LOCAL-04) ----

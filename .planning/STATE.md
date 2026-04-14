@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 Phase: 1 of 3 (Views)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-04-14 - Completed quick task 1: Fix push/pull button functionality in local and server file tabs
+Last activity: 2026-04-14 - Completed quick task 2: fix sync status indicators not updating after push/pull actions
 
 Progress: [███░░░░░░░] 33%
 
