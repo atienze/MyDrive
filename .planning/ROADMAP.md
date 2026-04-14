@@ -59,7 +59,10 @@ Plans:
   2. Stopping the Go server causes an error banner to appear in the UI; restarting the server causes the banner to dismiss on the next successful poll
   3. Clicking "Full Sync" triggers POST /api/force-sync and the sync status card shows "Syncing..." during the operation
   4. Running go build from the repo root produces a valid binary and opening localhost:9876 serves the complete dashboard from the embedded file
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03-01-PLAN.md — Poll loop (pollData + setInterval), error banner HTML/CSS/JS, Full Sync button, fixture removal
 
 ## Progress
 
@@ -70,4 +73,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. CSS Foundation + Overview | 2/2 | Complete   | 2026-04-12 |
 | 2. Files View | 0/2 | Not started | - |
-| 3. Integration + Polish | 0/TBD | Not started | - |
+| 3. Integration + Polish | 0/1 | Not started | - |
