@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-04-14T23:31:08.820Z"
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-04-14T23:34:40.529Z"
 last_activity: "2026-04-14 - Completed quick task 2: fix sync status indicators not updating after push/pull actions"
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 7
   percent: 33
 ---
 
@@ -56,6 +56,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 02-individual-actions P01 | 5 | 1 tasks | 1 files |
 | Phase 02-individual-actions P02 | 10 | 2 tasks | 1 files |
 | Phase 03-bulk-select P01 | 12 | 2 tasks | 1 files |
+| Phase 03-bulk-select P02 | 9 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 02-individual-actions]: pushFile() conditionally calls loadServerViewData() when App.serverLoaded is true so sync dots update correctly after push
 - [Phase 03-bulk-select]: Bulk bars placed as siblings of .files-table-wrap (not children) so position:sticky works against #app-main overflow container
 - [Phase 03-bulk-select]: enterBulkMode disables Select button (opacity 0.5) to prevent double-entry; clearBulkMode re-enables it
+- [Phase 03-bulk-select]: data-path uses escapeHtml() only in row checkboxes; dataset.path access bypasses HTML re-parsing so no extra .replace() needed
+- [Phase 03-bulk-select]: Folder rows get empty td.td-bulk for column alignment but no checkbox — folders not selectable by design
 
 ### Pending Todos
 
@@ -98,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:31:08.817Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-04-14T23:34:40.526Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
