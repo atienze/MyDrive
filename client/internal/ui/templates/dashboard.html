@@ -937,6 +937,137 @@
       banner.style.display = 'none';
     }
 
+    // ---- Server sync-status computation (SERV-03, SERV-04) ----
+    // Three states: 'synced' (on server + locally with matching hash),
+    // 'amber' (on server + locally with differing hash),
+    // 'server-only' (on server, not found locally).
+    function computeServerSyncStatus(relPath) {
+      const clientEntry = Object.prototype.hasOwnProperty.call(App.cachedClientMap, relPath)
+        ? App.cachedClientMap[relPath] : null;
+      const serverEntry = App.cachedServerMap[relPath];
+      if (!clientEntry) return 'server-only';
+      if (clientEntry.hash === serverEntry.hash) return 'synced';
+      return 'amber';
+    }
+
+    // ---- Server view breadcrumb renderer ----
+    // Mirrors renderBreadcrumb() but reads App.serverPath and calls serverNavTo().
+    function renderServerBreadcrumb() {
+      const bc = document.getElementById('server-breadcrumb');
+      if (!bc) return;
+      const path = App.serverPath;
+      const parts = path ? path.split('/').filter(Boolean) : [];
+
+      let html = '<button class="bc-seg" onclick="serverNavTo(\'\')">Home</button>';
+      let accumulated = '';
+      for (let i = 0; i < parts.length; i++) {
+        accumulated += parts[i] + '/';
+        html += '<span class="bc-sep">/</span>';
+        if (i < parts.length - 1) {
+          const target = accumulated;
+          html += '<button class="bc-seg" onclick="serverNavTo(\'' + escapeHtml(target) + '\')">' + escapeHtml(parts[i]) + '</button>';
+        } else {
+          html += '<span class="bc-cur">' + escapeHtml(parts[i]) + '</span>';
+        }
+      }
+      bc.innerHTML = html;
+    }
+
+    // ---- Navigate to a path in the Server view ----
+    // Mirrors filesNavTo() but for App.serverPath. Only called from user interaction.
+    function serverNavTo(path) {
+      App.serverPath = path;
+      renderServerBreadcrumb();
+      renderServerTable();
+    }
+
+    // ---- Server table renderer (SERV-01, SERV-03, SERV-04, SERV-07) ----
+    function renderServerTable() {
+      const tbody = document.getElementById('server-tbody');
+      if (!tbody) return;
+      const allFiles = App.cachedServerFiles || [];
+      const { folders, files } = getFilesViewEntries(allFiles, App.serverPath);
+
+      if (folders.length === 0 && files.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">This folder is empty</td></tr>';
+        renderServerFooter();
+        return;
+      }
+
+      let html = '';
+
+      // Folder rows first
+      for (const folderName of folders) {
+        const fullFolderPath = App.serverPath + folderName + '/';
+        html += '<tr class="row-folder" onclick="serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+          '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
+          '<td class="td-muted">\u2014</td>' +
+          '<td></td>' +
+          '</tr>';
+      }
+
+      // File rows
+      for (const f of files) {
+        const name = f.rel_path.slice(App.serverPath.length);
+        const size = f.size_human || formatBytes(f.size || 0);
+        const status = computeServerSyncStatus(f.rel_path);
+        const dotHtml = '<span class="sync-dot ' + status + '"></span>';
+        // Status label alongside dot for screen reader context
+        const statusLabel = status === 'synced' ? 'Synced' : (status === 'amber' ? 'Modified' : 'Server only');
+        html += '<tr>' +
+          '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
+          '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
+          '<td><span style="display:flex;align-items:center;gap:6px">' + dotHtml + '<span class="td-muted" style="font-size:12px">' + statusLabel + '</span></span></td>' +
+          '</tr>';
+      }
+
+      tbody.innerHTML = html;
+      renderServerFooter();
+    }
+
+    // ---- Server footer renderer (SERV-08) ----
+    function renderServerFooter() {
+      const footer = document.getElementById('server-footer');
+      if (!footer) return;
+      const allFiles = App.cachedServerFiles || [];
+      const { folders, files } = getFilesViewEntries(allFiles, App.serverPath);
+
+      const itemCount = folders.length + files.length;
+      const totalBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
+
+      const countLabel = itemCount === 1 ? '1 item' : itemCount + ' items';
+      const sizeLabel = files.length > 0 ? ' \u2014 ' + formatBytes(totalBytes) : '';
+
+      footer.innerHTML = '<span class="footer-summary">Server total: ' + escapeHtml(countLabel + sizeLabel) + '</span>';
+    }
+
+    // ---- Load Server view data on demand (SERV-01, SERV-02) ----
+    // ONLY called from the Refresh button in the Server tab.
+    // NEVER called from refreshData() — server fetch is always user-initiated.
+    async function loadServerViewData() {
+      const tbody = document.getElementById('server-tbody');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">Loading\u2026</td></tr>';
+      }
+      try {
+        const res = await fetch('/api/files/server');
+        if (!res.ok) throw new Error('non-2xx');
+        const data = await res.json();
+        App.cachedServerFiles = data.files || [];
+        App.cachedServerMap = Object.create(null);
+        for (const f of App.cachedServerFiles) App.cachedServerMap[f.rel_path] = f;
+        App.serverLoaded = true;
+        hideErrorBanner();
+        renderServerBreadcrumb();
+        renderServerTable();
+      } catch (_) {
+        showErrorBanner('Failed to load server files \u2014 click Refresh to retry');
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">Failed to load. Click Refresh to retry.</td></tr>';
+        }
+      }
+    }
+
     async function refreshData() {
       try {
         const [statusRes, clientRes] = await Promise.all([
