@@ -1140,10 +1140,8 @@
 
     async function pushFile(relPath) {
       try {
-        const res = await fetch('/api/files/upload', {
+        const res = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: relPath }),
         });
         if (!res.ok) throw new Error('upload failed: ' + res.status);
         // Re-fetch both client and server maps so sync dot updates correctly
@@ -1158,10 +1156,8 @@
     async function deleteLocalFile(relPath) {
       if (!confirm('Delete "' + relPath + '" from your local machine?\nThis cannot be undone.')) return;
       try {
-        const res = await fetch('/api/files/client', {
+        const res = await fetch('/api/files/client?path=' + encodeURIComponent(relPath), {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: relPath }),
         });
         if (!res.ok) throw new Error('delete failed: ' + res.status);
         await refreshData();
@@ -1174,10 +1170,8 @@
 
     async function pullFile(relPath) {
       try {
-        const res = await fetch('/api/files/download', {
+        const res = await fetch('/api/files/download?path=' + encodeURIComponent(relPath), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: relPath }),
         });
         if (!res.ok) throw new Error('download failed: ' + res.status);
         // Refresh local view so the newly pulled file appears and sync dots update
@@ -1190,10 +1184,8 @@
     async function deleteServerFile(relPath) {
       if (!confirm('Remove "' + relPath + '" from the server?\nThis cannot be undone.')) return;
       try {
-        const res = await fetch('/api/files/server', {
+        const res = await fetch('/api/files/server?path=' + encodeURIComponent(relPath), {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: relPath }),
         });
         if (!res.ok) throw new Error('delete failed: ' + res.status);
         // Re-fetch server files so removed file disappears from server table
