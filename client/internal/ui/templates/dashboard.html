@@ -854,47 +854,6 @@
       renderFilesTable(); // renderFilesTable now calls renderFilesFooter() at the end
     }
 
-    // ---- Files view fixture data ----
-    // Fixture client files — used until Phase 3 wires live API poll.
-    // Demonstrates folder reconstruction, nested paths, and diverse extensions (GLOB-06).
-    // Hash fields added so computeSyncStatus can compare client vs server hashes.
-    const FIXTURE_CLIENT_FILES = [
-      { rel_path: 'notes/meeting.md',          hash: 'aaaa1111', size: 4096,        size_human: '4 KB'   },
-      { rel_path: 'notes/todo.txt',            hash: 'bbbb2222', size: 1024,        size_human: '1 KB'   },
-      { rel_path: 'photos/trip/img001.jpg',    hash: 'cccc3333', size: 3200000,     size_human: '3.1 MB' },
-      { rel_path: 'photos/trip/img002.png',    hash: 'dddd4444', size: 2800000,     size_human: '2.7 MB' },
-      { rel_path: 'photos/portrait.webp',      hash: 'hhhh8888', size: 800000,      size_human: '781 KB' },
-      { rel_path: 'backup/db.sqlite',          hash: 'clienthash', size: 512000000, size_human: '488 MB' },
-      { rel_path: 'backup/logs.tar.gz',        hash: 'iiii9999', size: 10240000,    size_human: '9.8 MB' },
-      { rel_path: 'docs/report.pdf',           hash: 'eeee5555', size: 2100000,     size_human: '2 MB'   },
-      { rel_path: 'config.toml',               hash: 'ffff6666', size: 512,         size_human: '512 B'  },
-      { rel_path: 'README.md',                 hash: 'gggg7777', size: 3072,        size_human: '3 KB'   },
-      { rel_path: 'sync\u00e9.go',             hash: 'jjjj0000', size: 8192,        size_human: '8 KB'   }, // non-ASCII filename
-    ];
-
-    // Fixture server files — used until Phase 3 wires live /api/files/server poll.
-    // Deliberately omits some client files (photos/portrait.webp, backup/logs.tar.gz, syncé.go)
-    // and uses a different hash for backup/db.sqlite to demonstrate conflict (amber) state.
-    // All rel_path values match real paths that may contain special chars — safeEncodePath handles them.
-    const FIXTURE_SERVER_FILES = [
-      { rel_path: 'notes/meeting.md',       hash: 'aaaa1111', size: 4096,      size_human: '4 KB',   device_id: 'MyLaptop' },
-      { rel_path: 'notes/todo.txt',         hash: 'bbbb2222', size: 1024,      size_human: '1 KB',   device_id: 'MyLaptop' },
-      { rel_path: 'photos/trip/img001.jpg', hash: 'cccc3333', size: 3200000,   size_human: '3.1 MB', device_id: 'MyLaptop' },
-      { rel_path: 'photos/trip/img002.png', hash: 'dddd4444', size: 2800000,   size_human: '2.7 MB', device_id: 'MyLaptop' },
-      { rel_path: 'backup/db.sqlite',       hash: 'different', size: 512000000, size_human: '488 MB', device_id: 'MyLaptop' },
-      { rel_path: 'docs/report.pdf',        hash: 'eeee5555', size: 2100000,   size_human: '2 MB',   device_id: 'MyLaptop' },
-      { rel_path: 'config.toml',            hash: 'ffff6666', size: 512,       size_human: '512 B',  device_id: 'MyLaptop' },
-      { rel_path: 'README.md',              hash: 'gggg7777', size: 3072,      size_human: '3 KB',   device_id: 'MyLaptop' },
-    ];
-    // Give FIXTURE_CLIENT_FILES matching hashes for synced files so dots render correctly.
-    // notes/meeting.md → aaaa1111, notes/todo.txt → bbbb2222, etc.
-    // backup/db.sqlite has hash 'clienthash' (differs from server 'different') → amber (conflict).
-    // photos/portrait.webp, backup/logs.tar.gz, syncé.go are client-only → amber.
-
-    // Boot: render Files view with fixture data immediately.
-    // Phase 3 will replace this call with one using live API responses.
-    loadFilesViewData(FIXTURE_CLIENT_FILES, FIXTURE_SERVER_FILES);
-
     function escapeHtml(str) {
       return String(str)
         .replace(/&/g, '&amp;')
@@ -903,34 +862,63 @@
         .replace(/"/g, '&quot;');
     }
 
-    // Fixture files array — usedBytes derived via .reduce() to establish GLOB-05 pattern for Phase 3
-    // (Phase 3 will replace this with files.reduce() over live /api/files/server response)
-    const FIXTURE_FILES = [
-      { rel_path: 'notes/meeting.md',    size: 4096 },
-      { rel_path: 'photos/img001.jpg',   size: 3_200_000 },
-      { rel_path: 'backup/db.sqlite',    size: 512_000_000 },
-      { rel_path: 'docs/report.pdf',     size: 2_100_000 },
-      { rel_path: 'videos/demo.mp4',     size: 18_000_000_000 - 515_716_096 }, // fills to ~18.4 GB total
-    ];
-    const FIXTURE_USED_BYTES = FIXTURE_FILES.reduce((acc, f) => acc + f.size, 0);
+    // ── Live API poll loop (GLOB-04) ────────────────────────────────────────────
 
-    // Fixture status snapshot — used until Phase 3 wires live API poll
-    const FIXTURE_SNAPSHOT = {
-      connected: true,
-      syncing: false,
-      last_sync_time: new Date(Date.now() - 7200000).toISOString(),
-      total_files: 42,
-      total_size: 0,
-      activities: [
-        { time: new Date(Date.now() - 600000).toISOString(),   message: 'Uploaded notes/meeting.md 4 KB' },
-        { time: new Date(Date.now() - 3600000).toISOString(),  message: 'Uploaded photos/img001.jpg 3.1 MB' },
-        { time: new Date(Date.now() - 7200000).toISOString(),  message: 'Downloaded backup/db.sqlite 512 MB' },
-        { time: new Date(Date.now() - 86400000).toISOString(), message: 'Deleted tmp/scratch.txt' },
-      ],
-    };
+    function showErrorBanner(msg) {
+      const banner = document.getElementById('error-banner');
+      if (!banner) return;
+      banner.textContent = msg || 'Server unreachable \u2014 retrying\u2026';
+      banner.style.display = '';
+    }
 
-    // Boot: render overview with fixture data immediately
-    renderOverview(FIXTURE_SNAPSHOT, FIXTURE_USED_BYTES);
+    function hideErrorBanner() {
+      const banner = document.getElementById('error-banner');
+      if (!banner) return;
+      banner.style.display = 'none';
+    }
+
+    async function pollData() {
+      try {
+        const [statusRes, serverRes, clientRes] = await Promise.all([
+          fetch('/api/status'),
+          fetch('/api/files/server'),
+          fetch('/api/files/client'),
+        ]);
+        if (!statusRes.ok || !serverRes.ok || !clientRes.ok) throw new Error('non-2xx');
+        const [snapshot, serverData, clientData] = await Promise.all([
+          statusRes.json(),
+          serverRes.json(),
+          clientRes.json(),
+        ]);
+        const serverFiles = serverData.files || [];
+        const clientFiles = clientData.files || [];
+        const usedBytes = serverFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+        hideErrorBanner();
+        renderOverview(snapshot, usedBytes);
+        loadFilesViewData(clientFiles, serverFiles);
+      } catch (_) {
+        showErrorBanner('Server unreachable \u2014 retrying in 10 s');
+      }
+    }
+
+    async function triggerSync() {
+      const btn = document.getElementById('btn-force-sync');
+      if (btn) btn.disabled = true;
+      try {
+        await fetch('/api/force-sync', { method: 'POST' });
+        const statSync = document.getElementById('stat-sync');
+        if (statSync) {
+          statSync.textContent = 'Syncing\u2026';
+          statSync.className = 'stat-value sync-busy';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Boot: immediate poll + 10-second interval (replaces fixture boot calls)
+    pollData();
+    setInterval(pollData, 10000);
   </script>
 </body>
 </html>
