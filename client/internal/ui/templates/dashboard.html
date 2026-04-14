@@ -918,6 +918,9 @@
     function renderFilesTable() {
       const tbody = document.getElementById('files-tbody');
       if (!tbody) return;
+      // Toggle bulk-active class on the table so CSS shows/hides .th-bulk and .td-bulk columns
+      const localTable = document.querySelector('#view-local .files-table');
+      if (localTable) localTable.classList.toggle('bulk-active', App.bulkMode.localActive);
       const allFiles = App.cachedFilesViewData || [];
       const { folders, files } = getFilesViewEntries(allFiles, App.filesPath);
 
@@ -932,6 +935,7 @@
       for (const folderName of folders) {
         const fullFolderPath = App.filesPath + folderName + '/';
         html += '<tr class="row-folder" onclick="filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td class="td-muted">\u2014</td>' +
@@ -951,6 +955,11 @@
         const status = computeSyncStatus(f.rel_path, App.cachedClientMap || {}, App.cachedServerMap || {});
         const dotHtml = '<span class="sync-dot ' + status + '"></span>';
         html += '<tr>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
+            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
+            'onchange="handleRowCheck(\'local\', this)" style="cursor:pointer;width:16px;height:16px" ' +
+            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.filesPath.length)) + '">' +
+          '</td>' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + modified + '</td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
@@ -963,6 +972,14 @@
       }
 
       tbody.innerHTML = html;
+      // Re-apply checked state from Set after innerHTML rebuild (prevents stale state on re-render)
+      if (App.bulkMode.localActive) {
+        tbody.querySelectorAll('input.row-check').forEach(cb => {
+          cb.checked = App.bulkMode.localSelected.has(cb.dataset.path);
+        });
+        updateSelectAllState('local');
+        updateBulkBar('local');
+      }
       renderFilesFooter();
     }
 
@@ -1109,6 +1126,8 @@
     function renderServerTable() {
       const tbody = document.getElementById('server-tbody');
       if (!tbody) return;
+      const serverTable = document.querySelector('#view-server .files-table');
+      if (serverTable) serverTable.classList.toggle('bulk-active', App.bulkMode.serverActive);
       const allFiles = App.cachedServerFiles || [];
       const { folders, files } = getFilesViewEntries(allFiles, App.serverPath);
 
@@ -1124,6 +1143,7 @@
       for (const folderName of folders) {
         const fullFolderPath = App.serverPath + folderName + '/';
         html += '<tr class="row-folder" onclick="serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
@@ -1140,6 +1160,11 @@
         // Status label alongside dot for screen reader context
         const statusLabel = status === 'synced' ? 'Synced' : (status === 'amber' ? 'Modified' : 'Server only');
         html += '<tr>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
+            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
+            'onchange="handleRowCheck(\'server\', this)" style="cursor:pointer;width:16px;height:16px" ' +
+            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.serverPath.length)) + '">' +
+          '</td>' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
           '<td><span style="display:flex;align-items:center;gap:6px">' + dotHtml + '<span class="td-muted" style="font-size:12px">' + statusLabel + '</span></span></td>' +
@@ -1151,6 +1176,13 @@
       }
 
       tbody.innerHTML = html;
+      if (App.bulkMode.serverActive) {
+        tbody.querySelectorAll('input.row-check').forEach(cb => {
+          cb.checked = App.bulkMode.serverSelected.has(cb.dataset.path);
+        });
+        updateSelectAllState('server');
+        updateBulkBar('server');
+      }
       renderServerFooter();
     }
 
