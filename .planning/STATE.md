@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-views-03-PLAN.md
-last_updated: "2026-04-14T20:21:06.401Z"
+stopped_at: Completed 02-individual-actions-01-PLAN.md
+last_updated: "2026-04-14T20:50:51.425Z"
 last_activity: 2026-04-14 — Roadmap created; 3 phases derived from 31 v1 requirements
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 33
 ---
 
@@ -53,6 +53,7 @@ Progress: [███░░░░░░░] 33%
 | Phase 01-views P01 | 8 | 2 tasks | 1 files |
 | Phase 01-views P02 | 2 | 2 tasks | 1 files |
 | Phase 01-views P03 | 15 | 2 tasks | 1 files |
+| Phase 02-individual-actions P01 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 01-views]: /api/files/server never called from refreshData() — strictly user-initiated via Refresh button
 - [Phase 01-views]: 44px touch target achieved via td padding (12px top/bottom) not tr min-height — CSS table layout ignores min-height on tr
 - [Phase 01-views]: Human verification approved: all 6 Phase 1 visual checks passed including tabs, server Refresh, 375px scroll, and dark mode
+- [Phase 02-individual-actions]: Used visibility:hidden/visible for .row-actions so Actions column width is stable on hover reveal (no layout jitter)
+- [Phase 02-individual-actions]: .action-btn min-height 28px + td padding 12px top/bottom yields 52px row touch target, meeting A11Y-03 44px minimum
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T20:21:06.399Z
-Stopped at: Completed 01-views-03-PLAN.md
+Last session: 2026-04-14T20:50:51.422Z
+Stopped at: Completed 02-individual-actions-01-PLAN.md
 Resume file: None
