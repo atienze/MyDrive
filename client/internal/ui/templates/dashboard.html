@@ -258,7 +258,7 @@
     }
 
     /* ---- Files view ---- */
-    #view-files {
+    #view-local {
       padding: 20px;
       max-width: 900px;
       margin: 0 auto;
@@ -445,7 +445,8 @@
     </div>
     <nav class="nav-tabs" id="nav-tabs">
       <div class="tab active" data-tab="overview" onclick="switchTab('overview')">Overview</div>
-      <div class="tab" data-tab="files" onclick="switchTab('files')">Files</div>
+      <div class="tab" data-tab="local" onclick="switchTab('local')">Local Files</div>
+      <div class="tab" data-tab="server" onclick="switchTab('server')">Server</div>
     </nav>
     <div class="avatar" id="user-avatar">MD</div>
   </header>
@@ -496,9 +497,9 @@
       </div>
 
       <!-- Browse files button -->
-      <button class="browse-btn" onclick="switchTab('files')">Browse files ↗</button>
+      <button class="browse-btn" onclick="switchTab('local')">Browse files ↗</button>
     </div>
-    <div id="view-files" style="display:none">
+    <div id="view-local" style="display:none">
       <!-- Breadcrumb path bar (FILE-01) -->
       <div id="files-breadcrumb" aria-label="Current path"></div>
 
@@ -522,6 +523,9 @@
       <!-- Footer bar: Plan 02 adds this -->
       <div id="files-footer"></div>
     </div>
+    <div id="view-server" style="display:none">
+      <!-- Server view — wired in plan 02 -->
+    </div>
   </main>
 
   <script>
@@ -530,6 +534,8 @@
     const App = {
       activeTab: 'overview',
       filesPath: '',                     // only reset on explicit Home breadcrumb click
+      serverPath: '',                    // server view navigation path — separate from filesPath
+      serverLoaded: false,               // true after first successful loadServerViewData()
       cachedFilesViewData: [],           // set by loadFilesViewData; read by renderFilesTable
       cachedServerFiles: [],             // set by Plan 02 for sync dot computation
       cachedClientMap: Object.create(null), // keyed by rel_path for O(1) sync checks
@@ -542,7 +548,8 @@
         el.classList.toggle('active', el.dataset.tab === tab);
       });
       document.getElementById('view-overview').style.display = tab === 'overview' ? '' : 'none';
-      document.getElementById('view-files').style.display   = tab === 'files'    ? '' : 'none';
+      document.getElementById('view-local').style.display    = tab === 'local'    ? '' : 'none';
+      document.getElementById('view-server').style.display   = tab === 'server'   ? '' : 'none';
     }
 
     const CIRCUMFERENCE = 2 * Math.PI * 82; // r=82 matches SVG circle
