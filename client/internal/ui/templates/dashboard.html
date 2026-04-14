@@ -1148,6 +1148,8 @@
         await refreshData();
         // If server data was previously loaded, refresh it too so server view stays consistent
         if (App.serverLoaded) await loadServerViewData();
+        // Re-render local table now that cachedServerMap is fresh — dots will compute correctly
+        renderFilesTable();
       } catch (err) {
         showErrorBanner('Push failed: ' + err.message);
       }
