@@ -850,14 +850,14 @@
     // Stores all files from /api/files/client into App.cachedFilesViewData.
     // Does NOT reset App.filesPath — navigation state is preserved across refreshes.
     // Called on page load and from the Refresh button.
-    function loadFilesViewData(clientFiles, serverFiles) {
+    // App.cachedServerMap is NOT updated here — it is populated lazily by loadServerViewData()
+    // when the user visits the Server tab. Sync dots start amber and become synced once the
+    // user loads the Server view at least once.
+    function loadFilesViewData(clientFiles) {
       App.cachedFilesViewData = clientFiles || [];
-      // Build lookup maps keyed by rel_path for O(1) sync status checks
+      // Build lookup map keyed by rel_path for O(1) sync status checks
       App.cachedClientMap = Object.create(null);
       for (const f of App.cachedFilesViewData) App.cachedClientMap[f.rel_path] = f;
-      App.cachedServerFiles = serverFiles || [];
-      App.cachedServerMap = Object.create(null);
-      for (const f of App.cachedServerFiles) App.cachedServerMap[f.rel_path] = f;
       renderBreadcrumb();
       renderFilesTable(); // renderFilesTable now calls renderFilesFooter() at the end
     }
@@ -887,23 +887,21 @@
 
     async function refreshData() {
       try {
-        const [statusRes, serverRes, clientRes] = await Promise.all([
+        const [statusRes, clientRes] = await Promise.all([
           fetch('/api/status'),
-          fetch('/api/files/server'),
           fetch('/api/files/client'),
         ]);
-        if (!statusRes.ok || !serverRes.ok || !clientRes.ok) throw new Error('non-2xx');
-        const [snapshot, serverData, clientData] = await Promise.all([
+        if (!statusRes.ok || !clientRes.ok) throw new Error('non-2xx');
+        const [snapshot, clientData] = await Promise.all([
           statusRes.json(),
-          serverRes.json(),
           clientRes.json(),
         ]);
-        const serverFiles = serverData.files || [];
         const clientFiles = clientData.files || [];
-        const usedBytes = serverFiles.reduce((acc, f) => acc + (f.size || 0), 0);
+        // usedBytes: use cached server map if available, else 0
+        const usedBytes = Object.values(App.cachedServerMap).reduce((acc, f) => acc + (f.size || 0), 0);
         hideErrorBanner();
         renderOverview(snapshot, usedBytes);
-        loadFilesViewData(clientFiles, serverFiles);
+        loadFilesViewData(clientFiles);
       } catch (_) {
         showErrorBanner('Server unreachable \u2014 click Refresh to retry');
       }
