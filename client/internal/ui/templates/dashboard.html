@@ -1371,6 +1371,80 @@
       }
     }
 
+    // ---- Bulk operations (BULK-05, BULK-06, BULK-07, BULK-08) ----
+    // All bulk ops use sequential await (not Promise.all) because the server
+    // uses sync.Mutex on all mutating handlers — parallel fetches queue anyway.
+
+    async function bulkPush() {
+      const paths = [...App.bulkMode.localSelected];
+      if (paths.length === 0) return;
+      for (const relPath of paths) {
+        try {
+          const res = await fetch('/api/files/upload?path=' + encodeURIComponent(relPath), { method: 'POST' });
+          if (!res.ok) throw new Error('upload failed: ' + res.status);
+        } catch (err) {
+          showErrorBanner('Bulk push stopped at "' + relPath + '": ' + err.message);
+          break;
+        }
+      }
+      clearBulkMode('local');
+      await refreshData();
+      if (App.serverLoaded) await loadServerViewData();
+      renderFilesTable();
+    }
+
+    async function bulkPull() {
+      const paths = [...App.bulkMode.serverSelected];
+      if (paths.length === 0) return;
+      for (const relPath of paths) {
+        try {
+          const res = await fetch('/api/files/download?path=' + encodeURIComponent(relPath), { method: 'POST' });
+          if (!res.ok) throw new Error('download failed: ' + res.status);
+        } catch (err) {
+          showErrorBanner('Bulk pull stopped at "' + relPath + '": ' + err.message);
+          break;
+        }
+      }
+      clearBulkMode('server');
+      await refreshData();
+      if (App.serverLoaded) await loadServerViewData();
+    }
+
+    async function bulkDeleteLocal() {
+      const paths = [...App.bulkMode.localSelected];
+      if (paths.length === 0) return;
+      if (!confirm('Delete ' + paths.length + ' file(s) from your local machine?\nThis cannot be undone.')) return;
+      for (const relPath of paths) {
+        try {
+          const res = await fetch('/api/files/client?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
+          if (!res.ok) throw new Error('delete failed: ' + res.status);
+        } catch (err) {
+          showErrorBanner('Bulk delete stopped at "' + relPath + '": ' + err.message);
+          break;
+        }
+      }
+      clearBulkMode('local');
+      await refreshData();
+    }
+
+    async function bulkDeleteServer() {
+      const paths = [...App.bulkMode.serverSelected];
+      if (paths.length === 0) return;
+      if (!confirm('Remove ' + paths.length + ' file(s) from the server?\nThis cannot be undone.')) return;
+      for (const relPath of paths) {
+        try {
+          const res = await fetch('/api/files/server?path=' + encodeURIComponent(relPath), { method: 'DELETE' });
+          if (!res.ok) throw new Error('delete failed: ' + res.status);
+        } catch (err) {
+          showErrorBanner('Bulk delete stopped at "' + relPath + '": ' + err.message);
+          break;
+        }
+      }
+      clearBulkMode('server');
+      await loadServerViewData();
+      await refreshData();
+    }
+
     async function refreshData() {
       try {
         const [statusRes, clientRes] = await Promise.all([
