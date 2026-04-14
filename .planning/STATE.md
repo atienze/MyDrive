@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-files-view/02-02-PLAN.md
-last_updated: "2026-04-12T20:32:48.215Z"
-last_activity: 2026-04-12 — Roadmap created; ready for Phase 1 planning
+stopped_at: Completed quick-1/1-remove-polling-system
+last_updated: "2026-04-14T07:29:29.114Z"
+last_activity: 2026-04-14 — Completed quick task 1: Remove polling system from dashboard — manual control only for all data fetching
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 4
+  total_plans: 5
   completed_plans: 4
   percent: 25
 ---
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-12)
 Phase: 1 of 3 (CSS Foundation + Overview)
 Plan: 0 of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-04-12 — Roadmap created; ready for Phase 1 planning
+Last activity: 2026-04-14 — Completed quick task 1: Remove polling system from dashboard — manual control only for all data fetching
 
 Progress: [███░░░░░░░] 25%
 
@@ -84,8 +84,14 @@ None yet.
 - Verify /api/status StatusSnapshot struct fields before Phase 1 (SUMMARY.md flags potential discrepancy between summing size from /api/files/server vs a total_size field in /api/status)
 - Verify actual API response shapes (files: [...] with rel_path, size, hash, device_id) match assumptions before writing render functions
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 1 | Remove polling system from dashboard — manual control only for all data fetching | 2026-04-14 | 692ca67 | Verified | [1-remove-polling-system-from-dashboard-man](./quick/1-remove-polling-system-from-dashboard-man/) |
+
 ## Session Continuity
 
-Last session: 2026-04-12T20:32:48.212Z
-Stopped at: Completed 02-files-view/02-02-PLAN.md
+Last session: 2026-04-14T07:29:29.103Z
+Stopped at: Completed quick-1/1-remove-polling-system
 Resume file: None

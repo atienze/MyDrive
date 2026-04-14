@@ -1,8 +1,8 @@
-# Roadmap: myDrive Dashboard UI Redesign
+# Roadmap: myDrive Dashboard Overhaul
 
 ## Overview
 
-Three phases that build the new dashboard.html from the ground up: first establish the CSS token system and deliver a working Overview view, then add the Files view with folder navigation, then wire everything together into a deployable single-file dashboard. Each phase produces something the user can open in a browser and verify.
+Three phases deliver a complete dashboard overhaul on top of the existing vanilla JS/HTML/CSS UI. Phase 1 builds the browsable views — navigation, local files, and server files — so users can see everything without triggering a sync. Phase 2 wires individual file actions (push, pull, delete) to the existing API endpoints. Phase 3 adds bulk-select mode and bulk actions so users can act on many files at once.
 
 ## Phases
 
@@ -12,57 +12,52 @@ Three phases that build the new dashboard.html from the ground up: first establi
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: CSS Foundation + Overview** - CSS token system, global layout, and a working Overview view with donut chart, stat cards, and activity feed (completed 2026-04-12)
-- [ ] **Phase 2: Files View** - File table, breadcrumb navigation, folder hierarchy reconstruction, sync status dots, and file-type badges
-- [ ] **Phase 3: Integration + Polish** - Live API poll loop wired across both views, error banner, Full Sync button, nav tab switching, and go build verification
+- [ ] **Phase 1: Views** - Navigation tabs, local file browser, server file browser, base accessibility
+- [ ] **Phase 2: Individual Actions** - Per-row push, pull, delete actions wired to existing API endpoints
+- [ ] **Phase 3: Bulk Select** - Multi-select mode and bulk push, pull, delete across both views
 
 ## Phase Details
 
-### Phase 1: CSS Foundation + Overview
-**Goal**: The dashboard opens in a browser showing a working Overview page — storage donut chart, stat cards, activity feed, global header with nav tabs — in both light and dark mode, with no external CDN dependencies
+### Phase 1: Views
+**Goal**: Users can browse both local machine contents and all server-stored files, with clear sync-status indicators, without triggering a full sync
 **Depends on**: Nothing (first phase)
-**Requirements**: GLOB-01, GLOB-02, GLOB-03, GLOB-05, GLOB-07, OVR-01, OVR-02, OVR-03, OVR-04
+**Requirements**: NAV-01, NAV-02, NAV-03, LOCAL-01, LOCAL-02, LOCAL-05, SERV-01, SERV-02, SERV-03, SERV-04, SERV-07, SERV-08, A11Y-01, A11Y-02, A11Y-05, A11Y-06
 **Success Criteria** (what must be TRUE):
-  1. Opening dashboard.html in a browser shows a header with app logo, "myDrive" name, Overview/Files tabs, and a user avatar — no Tailwind CDN request in the network tab
-  2. The Overview page displays a centered SVG donut ring with a used/free arc, the free space value inside the ring, and three stat cards (Used, Total, Sync status) populated from fixture or live data
-  3. The activity feed shows rows with upload/download icon badges, filenames, relative timestamps, and file sizes
-  4. Switching OS appearance to dark mode changes the entire UI color scheme without a page reload and without any JS color values visible in rendered elements
-  5. All color and spacing values resolve from CSS custom properties; no hardcoded hex literals appear in JS-rendered HTML
-**Plans**: 2 plans
+  1. User can switch between Overview, Local Files, and Server tabs; active tab is visually indicated and survives a data refresh
+  2. Local Files tab shows the current directory with breadcrumb navigation, a sync-status dot per file, and a footer with item count and total size
+  3. Server tab shows all files from the homelab server — populated via Refresh button, not auto-sync — with folder navigation, breadcrumb, and a footer with total count and size
+  4. Server files visually distinguish server-only files from files that match a local copy (same hash = synced indicator)
+  5. All tabs are usable on mobile: touch targets meet 44px minimum, file tables scroll horizontally on small screens, minimal theme and dark mode are preserved throughout
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — CSS token system + dark mode block + global layout skeleton + header with nav tabs
-- [ ] 01-02-PLAN.md — Overview section: SVG donut chart, stat cards, activity feed, browse button, fixture data bootstrap
+- [ ] 01-01-PLAN.md — Three-tab nav, rename view-files to view-local, fix refreshData (no auto server fetch)
+- [ ] 01-02-PLAN.md — Server view HTML + JS: loadServerViewData, folder nav, sync indicators, footer
+- [ ] 01-03-PLAN.md — A11Y CSS fixes (horizontal scroll, touch targets, dark mode) + human verification
 
-### Phase 2: Files View
-**Goal**: The Files view is a fully navigable file browser — breadcrumb navigation works, folders reconstruct correctly from flat rel_path data, each row shows a colored extension badge and sync status dot, and the footer summarizes item count and total size
+### Phase 2: Individual Actions
+**Goal**: Users can push, pull, and delete individual files from either view using per-row action buttons wired to the existing API
 **Depends on**: Phase 1
-**Requirements**: FILE-01, FILE-02, FILE-03, FILE-04, FILE-05, FILE-06, GLOB-06
+**Requirements**: LOCAL-03, LOCAL-04, SERV-05, SERV-06, A11Y-03
 **Success Criteria** (what must be TRUE):
-  1. The Files view shows a table with Name (colored extension badge), Modified, Size, and Sync columns; folders appear before files; folder rows show — for Modified and Size
-  2. Clicking a folder row navigates into that folder and updates the breadcrumb path bar; clicking a breadcrumb segment navigates to that directory level without resetting the path on the next data refresh
-  3. Files with spaces, ampersands, or non-ASCII characters in their names appear correctly and do not cause broken API calls when their paths are used
-  4. The footer bar shows the correct item count and total size for the current directory; Upload and New Folder buttons are visible (non-functional stubs)
-  5. Each file row's sync status dot is green when the file exists on both client and server with matching hash, and amber otherwise
-**Plans**: 2 plans
+  1. Each local file row has a Push action that uploads the file to the server via `/api/files/upload`
+  2. Each local file row has a Delete action that removes the local file via DELETE `/api/files/client`, with a confirmation step
+  3. Each server file row has a Pull action that downloads the file to local machine via `/api/files/download`
+  4. Each server file row has a Delete action that removes the server file via DELETE `/api/files/server`, with a confirmation step
+  5. Action buttons are hidden behind hover on desktop and always visible on mobile (no overflow or clipping)
+**Plans**: TBD
 
-Plans:
-- [ ] 02-01-PLAN.md — Files view CSS + HTML structure + extension badge renderer + folder reconstruction + breadcrumb navigation JS
-- [ ] 02-02-PLAN.md — Sync dot computation, footer bar, safe path encoding, server fixture data
-
-### Phase 3: Integration + Polish
-**Goal**: The complete dashboard.html is deployed — both views update from live API data on a 10-second poll, the Full Sync button triggers a sync, an error banner appears when the server is unreachable, and a go build confirms the single-file embed works correctly
+### Phase 3: Bulk Select
+**Goal**: Users can select multiple files in either view and perform bulk push, pull, or delete in a single action
 **Depends on**: Phase 2
-**Requirements**: GLOB-04
+**Requirements**: BULK-01, BULK-02, BULK-03, BULK-04, BULK-05, BULK-06, BULK-07, BULK-08, BULK-09, A11Y-04
 **Success Criteria** (what must be TRUE):
-  1. Both the Overview and Files views update automatically every 10 seconds from live API responses without resetting the current Files directory path
-  2. Stopping the Go server causes an error banner to appear in the UI; restarting the server causes the banner to dismiss on the next successful poll
-  3. Clicking "Full Sync" triggers POST /api/force-sync and the sync status card shows "Syncing..." during the operation
-  4. Running go build from the repo root produces a valid binary and opening localhost:9876 serves the complete dashboard from the embedded file
-**Plans**: 1 plan
-
-Plans:
-- [ ] 03-01-PLAN.md — Poll loop (pollData + setInterval), error banner HTML/CSS/JS, Full Sync button, fixture removal
+  1. User can enter bulk-select mode in either view; a checkbox appears per row and a select-all toggle is available
+  2. A bulk action bar appears as soon as one item is selected, shows the selection count, and remains sticky while scrolling a long file list
+  3. Selected local files can be bulk-pushed to server; selected server files can be bulk-pulled to local machine
+  4. Selected server files can be bulk-deleted; selected local files can be bulk-deleted; both require a confirmation that shows the count of affected files
+  5. Bulk-select mode is cleared automatically when the user switches tabs or navigates into a subfolder
+**Plans**: TBD
 
 ## Progress
 
@@ -71,6 +66,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. CSS Foundation + Overview | 2/2 | Complete   | 2026-04-12 |
-| 2. Files View | 0/2 | Not started | - |
-| 3. Integration + Polish | 0/1 | Not started | - |
+| 1. Views | 0/TBD | Not started | - |
+| 2. Individual Actions | 0/TBD | Not started | - |
+| 3. Bulk Select | 0/TBD | Not started | - |
