@@ -484,6 +484,7 @@
       <!-- Full Sync button (GLOB-04) -->
       <div style="display:flex;justify-content:flex-start;padding:0 0 8px">
         <button id="btn-force-sync" class="footer-btn active" onclick="triggerSync()">Full Sync</button>
+        <button id="btn-refresh" class="footer-btn active" onclick="refreshData()">Refresh</button>
       </div>
 
       <!-- Activity feed -->
@@ -841,7 +842,7 @@
     // ---- Load Files view data and render ----
     // Stores all files from /api/files/client into App.cachedFilesViewData.
     // Does NOT reset App.filesPath — navigation state is preserved across refreshes.
-    // Called from fixture bootstrap below and from Phase 3 poll loop.
+    // Called on page load and from the Refresh button.
     function loadFilesViewData(clientFiles, serverFiles) {
       App.cachedFilesViewData = clientFiles || [];
       // Build lookup maps keyed by rel_path for O(1) sync status checks
@@ -862,7 +863,7 @@
         .replace(/"/g, '&quot;');
     }
 
-    // ── Live API poll loop (GLOB-04) ────────────────────────────────────────────
+    // ── On-demand data fetch ─────────────────────────────────────────────────────
 
     function showErrorBanner(msg) {
       const banner = document.getElementById('error-banner');
@@ -877,7 +878,7 @@
       banner.style.display = 'none';
     }
 
-    async function pollData() {
+    async function refreshData() {
       try {
         const [statusRes, serverRes, clientRes] = await Promise.all([
           fetch('/api/status'),
@@ -897,7 +898,7 @@
         renderOverview(snapshot, usedBytes);
         loadFilesViewData(clientFiles, serverFiles);
       } catch (_) {
-        showErrorBanner('Server unreachable \u2014 retrying in 10 s');
+        showErrorBanner('Server unreachable \u2014 click Refresh to retry');
       }
     }
 
@@ -916,9 +917,8 @@
       }
     }
 
-    // Boot: immediate poll + 10-second interval (replaces fixture boot calls)
-    pollData();
-    setInterval(pollData, 10000);
+    // Boot: fetch data once on page load.
+    refreshData();
   </script>
 </body>
 </html>
