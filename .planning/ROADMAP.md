@@ -12,7 +12,7 @@ Three phases deliver a complete dashboard overhaul on top of the existing vanill
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Views** - Navigation tabs, local file browser, server file browser, base accessibility
+- [x] **Phase 1: Views** - Navigation tabs, local file browser, server file browser, base accessibility (completed 2026-04-14)
 - [ ] **Phase 2: Individual Actions** - Per-row push, pull, delete actions wired to existing API endpoints
 - [ ] **Phase 3: Bulk Select** - Multi-select mode and bulk push, pull, delete across both views
 
@@ -45,7 +45,12 @@ Plans:
   3. Each server file row has a Pull action that downloads the file to local machine via `/api/files/download`
   4. Each server file row has a Delete action that removes the server file via DELETE `/api/files/server`, with a confirmation step
   5. Action buttons are hidden behind hover on desktop and always visible on mobile (no overflow or clipping)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Action button CSS (.row-actions, .action-btn, hover/mobile visibility rules)
+- [ ] 02-02-PLAN.md — Local file actions: pushFile(), deleteLocalFile(), Actions column in renderFilesTable()
+- [ ] 02-03-PLAN.md — Server file actions: pullFile(), deleteServerFile(), Actions column in renderServerTable() + human verification
 
 ### Phase 3: Bulk Select
 **Goal**: Users can select multiple files in either view and perform bulk push, pull, or delete in a single action
@@ -66,6 +71,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Views | 2/3 | In Progress|  |
-| 2. Individual Actions | 0/TBD | Not started | - |
+| 1. Views | 3/3 | Complete   | 2026-04-14 |
+| 2. Individual Actions | 0/3 | Not started | - |
 | 3. Bulk Select | 0/TBD | Not started | - |

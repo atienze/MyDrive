@@ -44,12 +44,12 @@
 
 ### Layout & Accessibility
 
-- [ ] **A11Y-01**: All interactive elements have minimum 44×44px touch target on mobile
-- [ ] **A11Y-02**: File tables scroll horizontally on small screens rather than overflowing/clipping
+- [x] **A11Y-01**: All interactive elements have minimum 44×44px touch target on mobile
+- [x] **A11Y-02**: File tables scroll horizontally on small screens rather than overflowing/clipping
 - [ ] **A11Y-03**: Action buttons in file rows are visible on hover (desktop) and always visible on mobile
 - [ ] **A11Y-04**: Bulk action bar is fixed/sticky so it remains visible when scrolling a long file list
-- [ ] **A11Y-05**: Minimal theme is maintained — no decorative color, consistent with existing CSS variable system
-- [ ] **A11Y-06**: Dark mode support is maintained for all new UI elements
+- [x] **A11Y-05**: Minimal theme is maintained — no decorative color, consistent with existing CSS variable system
+- [x] **A11Y-06**: Dark mode support is maintained for all new UI elements
 
 ## v2 Requirements
 
@@ -108,12 +108,12 @@
 | BULK-07 | Phase 3 | Pending |
 | BULK-08 | Phase 3 | Pending |
 | BULK-09 | Phase 3 | Pending |
-| A11Y-01 | Phase 1 | Pending |
-| A11Y-02 | Phase 1 | Pending |
+| A11Y-01 | Phase 1 | Complete |
+| A11Y-02 | Phase 1 | Complete |
 | A11Y-03 | Phase 2 | Pending |
 | A11Y-04 | Phase 3 | Pending |
-| A11Y-05 | Phase 1 | Pending |
-| A11Y-06 | Phase 1 | Pending |
+| A11Y-05 | Phase 1 | Complete |
+| A11Y-06 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 31 total

@@ -344,6 +344,58 @@
     .td-muted { color: var(--text-secondary); }
     .td-mono  { font-variant-numeric: tabular-nums; }
 
+    /* ---- Per-row action buttons (A11Y-03) ---- */
+    /* Container: sits in the Actions td, right-aligned */
+    .row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    /* Desktop: hide until row is hovered */
+    @media (pointer: fine) {
+      .row-actions { visibility: hidden; }
+      .files-table tbody tr:hover .row-actions { visibility: visible; }
+    }
+
+    /* Mobile: always visible (pointer: coarse covers touchscreens) */
+    @media (pointer: coarse) {
+      .row-actions { visibility: visible; }
+    }
+
+    /* Individual action button */
+    .action-btn {
+      background: transparent;
+      border: var(--border-width) solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-family: var(--font);
+      padding: 4px 10px;
+      min-height: 28px;   /* row td padding gives 44px touch target at row level */
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .action-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .action-btn.danger:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    /* Mobile: larger tap surface */
+    @media (pointer: coarse) {
+      .action-btn {
+        padding: 8px 12px;
+        min-height: 36px;
+        font-size: 12px;
+      }
+    }
+
     /* Extension badges (GLOB-06) */
     .ext-badge {
       display: inline-flex;
