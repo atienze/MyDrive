@@ -627,6 +627,10 @@
         <table class="files-table" aria-label="Files">
           <thead>
             <tr>
+              <th class="th-bulk" style="width:32px;padding:8px 8px">
+                <input type="checkbox" id="local-select-all" onchange="handleSelectAll('local', this)"
+                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all local files">
+              </th>
               <th style="width:40%">Name</th>
               <th style="width:18%">Modified</th>
               <th style="width:12%">Size</th>
@@ -659,6 +663,10 @@
         <table class="files-table" aria-label="Server files">
           <thead>
             <tr>
+              <th class="th-bulk" style="width:32px;padding:8px 8px">
+                <input type="checkbox" id="server-select-all" onchange="handleSelectAll('server', this)"
+                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all server files">
+              </th>
               <th style="width:45%">Name</th>
               <th style="width:16%">Size</th>
               <th style="width:18%">Status</th>
@@ -1187,6 +1195,55 @@
           tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--text-muted)">Failed to load. Click Refresh to retry.</td></tr>';
         }
       }
+    }
+
+    // ---- Bulk selection state management (BULK-03, BULK-04) ----
+
+    // Called when an individual row checkbox changes.
+    // Updates the Set and refreshes the select-all indicator and bulk bar.
+    function handleRowCheck(view, cb) {
+      const sel = App.bulkMode[view + 'Selected'];
+      if (cb.checked) sel.add(cb.dataset.path);
+      else            sel.delete(cb.dataset.path);
+      updateSelectAllState(view);
+      updateBulkBar(view);
+    }
+
+    // Called when the select-all checkbox in thead changes.
+    // Syncs all visible row checkboxes and the Set to match.
+    function handleSelectAll(view, cb) {
+      const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
+      const sel     = App.bulkMode[view + 'Selected'];
+      const allCbs  = document.querySelectorAll('#' + tbodyId + ' input.row-check');
+      sel.clear();
+      if (cb.checked) allCbs.forEach(c => sel.add(c.dataset.path));
+      allCbs.forEach(c => { c.checked = cb.checked; });
+      updateBulkBar(view);
+    }
+
+    // Syncs the select-all checkbox visual state (checked / unchecked / indeterminate).
+    // Must be called after every individual row check change.
+    function updateSelectAllState(view) {
+      const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
+      const sel     = App.bulkMode[view + 'Selected'];
+      const allCbs  = document.querySelectorAll('#' + tbodyId + ' input.row-check');
+      const allChk  = document.getElementById(view + '-select-all');
+      if (!allChk) return;
+      const total   = allCbs.length;
+      const checked = sel.size;
+      allChk.checked       = total > 0 && checked === total;
+      allChk.indeterminate = checked > 0 && checked < total;
+    }
+
+    // Shows or hides the bulk action bar and updates the count label.
+    // Called after any selection change.
+    function updateBulkBar(view) {
+      const bar     = document.getElementById(view + '-bulk-bar');
+      const countEl = document.getElementById(view + '-bulk-count');
+      if (!bar) return;
+      const sel = App.bulkMode[view + 'Selected'];
+      bar.classList.toggle('visible', sel.size > 0);
+      if (countEl) countEl.textContent = sel.size + ' selected';
     }
 
     // ---- Bulk select mode (BULK-01, BULK-02, BULK-09) ----
