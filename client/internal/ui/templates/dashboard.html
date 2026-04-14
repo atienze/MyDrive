@@ -623,9 +623,10 @@
         <table class="files-table" aria-label="Server files">
           <thead>
             <tr>
-              <th style="width:55%">Name</th>
-              <th style="width:20%">Size</th>
-              <th style="width:25%">Status</th>
+              <th style="width:45%">Name</th>
+              <th style="width:16%">Size</th>
+              <th style="width:18%">Status</th>
+              <th style="width:21%" aria-label="Actions"></th>
             </tr>
           </thead>
           <tbody id="server-tbody">
@@ -1065,6 +1066,7 @@
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
+          '<td></td>' +
           '</tr>';
       }
 
@@ -1080,6 +1082,10 @@
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
           '<td><span style="display:flex;align-items:center;gap:6px">' + dotHtml + '<span class="td-muted" style="font-size:12px">' + statusLabel + '</span></span></td>' +
+          '<td><div class="row-actions">' +
+            '<button class="action-btn" onclick="pullFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Pull to local machine">Pull</button>' +
+            '<button class="action-btn danger" onclick="deleteServerFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Remove from server">Delete</button>' +
+          '</div></td>' +
           '</tr>';
       }
 
@@ -1161,6 +1167,41 @@
         await refreshData();
       } catch (err) {
         showErrorBanner('Delete failed: ' + err.message);
+      }
+    }
+
+    // ---- Server file actions (SERV-05, SERV-06) ----
+
+    async function pullFile(relPath) {
+      try {
+        const res = await fetch('/api/files/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath }),
+        });
+        if (!res.ok) throw new Error('download failed: ' + res.status);
+        // Refresh local view so the newly pulled file appears and sync dots update
+        await refreshData();
+      } catch (err) {
+        showErrorBanner('Pull failed: ' + err.message);
+      }
+    }
+
+    async function deleteServerFile(relPath) {
+      if (!confirm('Remove "' + relPath + '" from the server?\nThis cannot be undone.')) return;
+      try {
+        const res = await fetch('/api/files/server', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: relPath }),
+        });
+        if (!res.ok) throw new Error('delete failed: ' + res.status);
+        // Re-fetch server files so removed file disappears from server table
+        await loadServerViewData();
+        // Also refresh local view so sync dots update (file no longer on server)
+        await refreshData();
+      } catch (err) {
+        showErrorBanner('Server delete failed: ' + err.message);
       }
     }
 
