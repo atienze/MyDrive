@@ -100,9 +100,10 @@ None yet.
 | 2 | Fix sync dot not turning green after push (renderFilesTable after loadServerViewData) | 2026-04-14 | fa456be | [2-fix-sync-status-indicators-not-updating-](./quick/2-fix-sync-status-indicators-not-updating-/) |
 | 3 | Bulk select mode persists on tab/folder navigation; Select button toggles mode | 2026-04-15 | 46ace8b | [3-bulk-select-mode-persists-on-nav-cleared](./quick/3-bulk-select-mode-persists-on-nav-cleared/) |
 | 4 | Verify remaining plan phases — created missing SUMMARYs for 02-03 and 03-03, marked all 3 phases complete in ROADMAP.md and STATE.md | 2026-04-15 | (see final commit) | [4-verify-if-i-have-any-remaining-plan-phas](./quick/4-verify-if-i-have-any-remaining-plan-phas/) |
+| 5 | Move bulk checkboxes to right side of file rows, hide action buttons in bulk mode, row-tap to toggle selection | 2026-04-15 | c1dd18d | [5-move-select-checkboxes-closer-to-select-](./quick/5-move-select-checkboxes-closer-to-select-/) |
 
 ## Session Continuity
 
-Last session: 2026-04-15T07:33:01.025Z
-Stopped at: Completed quick task 3: bulk select mode persists on nav
+Last session: 2026-04-15
+Stopped at: Completed quick task 5 Tasks 1-2; awaiting Task 3 human verification checkpoint
 Resume file: None
