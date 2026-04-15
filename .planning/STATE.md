@@ -101,9 +101,10 @@ None yet.
 | 3 | Bulk select mode persists on tab/folder navigation; Select button toggles mode | 2026-04-15 | 46ace8b | [3-bulk-select-mode-persists-on-nav-cleared](./quick/3-bulk-select-mode-persists-on-nav-cleared/) |
 | 4 | Verify remaining plan phases — created missing SUMMARYs for 02-03 and 03-03, marked all 3 phases complete in ROADMAP.md and STATE.md | 2026-04-15 | (see final commit) | [4-verify-if-i-have-any-remaining-plan-phas](./quick/4-verify-if-i-have-any-remaining-plan-phas/) |
 | 5 | Move bulk checkboxes to right side of file rows, hide action buttons in bulk mode, row-tap to toggle selection | 2026-04-15 | c1dd18d | [5-move-select-checkboxes-closer-to-select-](./quick/5-move-select-checkboxes-closer-to-select-/) |
+| 6 | Fix folder nav in bulk mode, replace checkboxes with row-highlight, add Select All button, fix stale panel after bulk ops | 2026-04-15 | 7d69e79 | [6-fix-select-mode-navigation-replace-check](./quick/6-fix-select-mode-navigation-replace-check/) |
 
 ## Session Continuity
 
 Last session: 2026-04-15
-Stopped at: Completed quick task 5 Tasks 1-2; awaiting Task 3 human verification checkpoint
+Stopped at: Completed quick task 6; awaiting human verification checkpoint
 Resume file: None
