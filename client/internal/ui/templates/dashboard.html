@@ -544,14 +544,12 @@
       flex: 1;
       min-width: 0;
     }
-    /* Checkbox column th: hidden when not in bulk mode */
-    .files-table:not(.bulk-active) .th-bulk { display: none; }
-    /* Checkbox column td: hidden when not in bulk mode */
-    .files-table:not(.bulk-active) .td-bulk { display: none; }
     /* Hide per-row action buttons when bulk mode is active */
     .files-table.bulk-active .row-actions { display: none; }
     /* Pointer cursor on rows in bulk mode for tap affordance */
     .files-table.bulk-active tbody tr { cursor: pointer; }
+    /* Selected row highlight in bulk mode */
+    .files-table.bulk-active tbody tr.row-selected { background: rgba(255,255,255,0.08); }
   </style>
 </head>
 <body>
@@ -636,10 +634,6 @@
               <th style="width:12%">Size</th>
               <th style="width:12%">Sync</th>
               <th style="width:16%" aria-label="Actions"></th>
-              <th class="th-bulk" style="width:32px;padding:8px 8px">
-                <input type="checkbox" id="local-select-all" onchange="handleSelectAll('local', this)"
-                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all local files">
-              </th>
             </tr>
           </thead>
           <tbody id="files-tbody">
@@ -653,6 +647,7 @@
         <span class="bulk-count" id="local-bulk-count">0 selected</span>
         <button class="action-btn" onclick="bulkPush()">Push</button>
         <button class="action-btn danger" onclick="bulkDeleteLocal()">Delete</button>
+        <button class="footer-btn active" onclick="selectAllFiles('local')">Select All</button>
         <button class="footer-btn active" onclick="clearBulkMode('local')">Cancel</button>
       </div>
       <div id="files-footer"></div>
@@ -671,10 +666,6 @@
               <th style="width:16%">Size</th>
               <th style="width:18%">Status</th>
               <th style="width:19%" aria-label="Actions"></th>
-              <th class="th-bulk" style="width:32px;padding:8px 8px">
-                <input type="checkbox" id="server-select-all" onchange="handleSelectAll('server', this)"
-                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all server files">
-              </th>
             </tr>
           </thead>
           <tbody id="server-tbody">
@@ -687,6 +678,7 @@
         <span class="bulk-count" id="server-bulk-count">0 selected</span>
         <button class="action-btn" onclick="bulkPull()">Pull</button>
         <button class="action-btn danger" onclick="bulkDeleteServer()">Delete</button>
+        <button class="footer-btn active" onclick="selectAllFiles('server')">Select All</button>
         <button class="footer-btn active" onclick="clearBulkMode('server')">Cancel</button>
       </div>
       <div id="server-footer"></div>
@@ -919,7 +911,7 @@
     function renderFilesTable() {
       const tbody = document.getElementById('files-tbody');
       if (!tbody) return;
-      // Toggle bulk-active class on the table so CSS shows/hides .th-bulk and .td-bulk columns
+      // Toggle bulk-active class on the table for bulk mode CSS (row highlight, hide actions)
       const localTable = document.querySelector('#view-local .files-table');
       if (localTable) localTable.classList.toggle('bulk-active', App.bulkMode.localActive);
       const allFiles = App.cachedFilesViewData || [];
@@ -935,13 +927,12 @@
       // Folder rows first (FILE-03): Modified and Size show em dash
       for (const folderName of folders) {
         const fullFolderPath = App.filesPath + folderName + '/';
-        html += '<tr class="row-folder" onclick="App.bulkMode.localActive ? void(0) : filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+        html += '<tr class="row-folder" onclick="filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
           '<td></td>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '</tr>';
       }
 
@@ -955,7 +946,7 @@
         // Sync dot: real sync status from both maps (FILE-06)
         const status = computeSyncStatus(f.rel_path, App.cachedClientMap || {}, App.cachedServerMap || {});
         const dotHtml = '<span class="sync-dot ' + status + '"></span>';
-        html += '<tr onclick="handleRowTap(\'local\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
+        html += '<tr data-path="' + escapeHtml(f.rel_path) + '" onclick="handleRowTap(\'local\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + modified + '</td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
@@ -964,21 +955,17 @@
             '<button class="action-btn" onclick="pushFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Push to server">Push</button>' +
             '<button class="action-btn danger" onclick="deleteLocalFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Delete local file">Delete</button>' +
           '</div></td>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
-            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
-            'onchange="handleRowCheck(\'local\', this)" style="cursor:pointer;width:16px;height:16px" ' +
-            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.filesPath.length)) + '">' +
-          '</td>' +
           '</tr>';
       }
 
       tbody.innerHTML = html;
-      // Re-apply checked state from Set after innerHTML rebuild (prevents stale state on re-render)
+      // Re-apply selected class from Set after innerHTML rebuild (prevents stale state on re-render)
       if (App.bulkMode.localActive) {
-        tbody.querySelectorAll('input.row-check').forEach(cb => {
-          cb.checked = App.bulkMode.localSelected.has(cb.dataset.path);
+        tbody.querySelectorAll('tr[data-path]').forEach(row => {
+          if (App.bulkMode.localSelected.has(row.dataset.path)) {
+            row.classList.add('row-selected');
+          }
         });
-        updateSelectAllState('local');
         updateBulkBar('local');
       }
       renderFilesFooter();
@@ -1142,12 +1129,11 @@
       // Folder rows first
       for (const folderName of folders) {
         const fullFolderPath = App.serverPath + folderName + '/';
-        html += '<tr class="row-folder" onclick="App.bulkMode.serverActive ? void(0) : serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
+        html += '<tr class="row-folder" onclick="serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
           '<td></td>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '</tr>';
       }
 
@@ -1159,7 +1145,7 @@
         const dotHtml = '<span class="sync-dot ' + status + '"></span>';
         // Status label alongside dot for screen reader context
         const statusLabel = status === 'synced' ? 'Synced' : (status === 'amber' ? 'Modified' : 'Server only');
-        html += '<tr onclick="handleRowTap(\'server\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
+        html += '<tr data-path="' + escapeHtml(f.rel_path) + '" onclick="handleRowTap(\'server\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
           '<td><span style="display:flex;align-items:center;gap:6px">' + dotHtml + '<span class="td-muted" style="font-size:12px">' + statusLabel + '</span></span></td>' +
@@ -1167,20 +1153,16 @@
             '<button class="action-btn" onclick="pullFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Pull to local machine">Pull</button>' +
             '<button class="action-btn danger" onclick="deleteServerFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Remove from server">Delete</button>' +
           '</div></td>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
-            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
-            'onchange="handleRowCheck(\'server\', this)" style="cursor:pointer;width:16px;height:16px" ' +
-            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.serverPath.length)) + '">' +
-          '</td>' +
           '</tr>';
       }
 
       tbody.innerHTML = html;
       if (App.bulkMode.serverActive) {
-        tbody.querySelectorAll('input.row-check').forEach(cb => {
-          cb.checked = App.bulkMode.serverSelected.has(cb.dataset.path);
+        tbody.querySelectorAll('tr[data-path]').forEach(row => {
+          if (App.bulkMode.serverSelected.has(row.dataset.path)) {
+            row.classList.add('row-selected');
+          }
         });
-        updateSelectAllState('server');
         updateBulkBar('server');
       }
       renderServerFooter();
@@ -1232,54 +1214,45 @@
     // ---- Bulk selection state management (BULK-03, BULK-04) ----
 
     // Called when clicking anywhere on a file row in bulk mode (BULK-10).
-    // Toggles the row's checkbox without double-firing when clicking directly on the input.
+    // Toggles the row highlight using CSS class — no checkboxes.
     function handleRowTap(view, relPath, event) {
       // Only act when bulk mode is active
       if (!App.bulkMode[view + 'Active']) return;
-      // Don't double-fire if the click was directly on the checkbox input
-      if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox') return;
-      // Find the checkbox for this row and toggle it
+      // Don't fire on action buttons
+      if (event.target.closest('.row-actions')) return;
       const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
-      const cb = document.querySelector('#' + tbodyId + ' input.row-check[data-path="' + CSS.escape(relPath) + '"]');
-      if (!cb) return;
-      cb.checked = !cb.checked;
-      handleRowCheck(view, cb);
-    }
-
-    // Called when an individual row checkbox changes.
-    // Updates the Set and refreshes the select-all indicator and bulk bar.
-    function handleRowCheck(view, cb) {
+      const row = document.querySelector('#' + tbodyId + ' tr[data-path="' + CSS.escape(relPath) + '"]');
+      if (!row) return;
       const sel = App.bulkMode[view + 'Selected'];
-      if (cb.checked) sel.add(cb.dataset.path);
-      else            sel.delete(cb.dataset.path);
-      updateSelectAllState(view);
+      if (sel.has(relPath)) {
+        sel.delete(relPath);
+        row.classList.remove('row-selected');
+      } else {
+        sel.add(relPath);
+        row.classList.add('row-selected');
+      }
       updateBulkBar(view);
     }
 
-    // Called when the select-all checkbox in thead changes.
-    // Syncs all visible row checkboxes and the Set to match.
-    function handleSelectAll(view, cb) {
+    // Selects or deselects all visible file rows in bulk mode.
+    // Toggles: if all rows are selected, deselects all; otherwise selects all.
+    function selectAllFiles(view) {
       const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
-      const sel     = App.bulkMode[view + 'Selected'];
-      const allCbs  = document.querySelectorAll('#' + tbodyId + ' input.row-check');
-      sel.clear();
-      if (cb.checked) allCbs.forEach(c => sel.add(c.dataset.path));
-      allCbs.forEach(c => { c.checked = cb.checked; });
+      const sel = App.bulkMode[view + 'Selected'];
+      const rows = document.querySelectorAll('#' + tbodyId + ' tr[data-path]');
+      const allSelected = rows.length > 0 && sel.size === rows.length;
+      if (allSelected) {
+        // Deselect all
+        sel.clear();
+        rows.forEach(r => r.classList.remove('row-selected'));
+      } else {
+        // Select all
+        rows.forEach(r => {
+          sel.add(r.dataset.path);
+          r.classList.add('row-selected');
+        });
+      }
       updateBulkBar(view);
-    }
-
-    // Syncs the select-all checkbox visual state (checked / unchecked / indeterminate).
-    // Must be called after every individual row check change.
-    function updateSelectAllState(view) {
-      const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
-      const sel     = App.bulkMode[view + 'Selected'];
-      const allCbs  = document.querySelectorAll('#' + tbodyId + ' input.row-check');
-      const allChk  = document.getElementById(view + '-select-all');
-      if (!allChk) return;
-      const total   = allCbs.length;
-      const checked = sel.size;
-      allChk.checked       = total > 0 && checked === total;
-      allChk.indeterminate = checked > 0 && checked < total;
     }
 
     // Shows or hides the bulk action bar and updates the count label.
@@ -1319,13 +1292,14 @@
       // Hide bulk bar
       const bar = document.getElementById(view + '-bulk-bar');
       if (bar) bar.classList.remove('visible');
-      // Remove bulk-active class from table
+      // Remove bulk-active class from table and clear any row-selected highlights
       const table = document.querySelector(
         view === 'local' ? '#view-local .files-table' : '#view-server .files-table'
       );
-      if (table) table.classList.remove('bulk-active');
-      if (view === 'local') renderFilesTable();
-      else                  renderServerTable();
+      if (table) {
+        table.classList.remove('bulk-active');
+        table.querySelectorAll('tr.row-selected').forEach(r => r.classList.remove('row-selected'));
+      }
     }
 
     // ---- Local file actions (LOCAL-03, LOCAL-04) ----
@@ -1428,6 +1402,7 @@
       clearBulkMode('server');
       await refreshData();
       if (App.serverLoaded) await loadServerViewData();
+      renderFilesTable();
     }
 
     async function bulkDeleteLocal() {
