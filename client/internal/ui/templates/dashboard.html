@@ -710,8 +710,6 @@
     };
 
     function switchTab(tab) {
-      clearBulkMode('local');
-      clearBulkMode('server');
       App.activeTab = tab;
       document.querySelectorAll('.tab').forEach(el => {
         el.classList.toggle('active', el.dataset.tab === tab);
@@ -905,7 +903,6 @@
     // Only call this from user interaction (folder click, breadcrumb click).
     // Do NOT call from data refresh — refreshes must preserve App.filesPath.
     function filesNavTo(path) {
-      clearBulkMode('local');
       App.filesPath = path;
       renderBreadcrumb();
       renderFilesTable();
@@ -1116,7 +1113,6 @@
     // ---- Navigate to a path in the Server view ----
     // Mirrors filesNavTo() but for App.serverPath. Only called from user interaction.
     function serverNavTo(path) {
-      clearBulkMode('server');
       App.serverPath = path;
       renderServerBreadcrumb();
       renderServerTable();
