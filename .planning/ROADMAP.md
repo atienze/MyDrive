@@ -13,8 +13,8 @@ Three phases deliver a complete dashboard overhaul on top of the existing vanill
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Views** - Navigation tabs, local file browser, server file browser, base accessibility (completed 2026-04-14)
-- [ ] **Phase 2: Individual Actions** - Per-row push, pull, delete actions wired to existing API endpoints
-- [ ] **Phase 3: Bulk Select** - Multi-select mode and bulk push, pull, delete across both views
+- [x] **Phase 2: Individual Actions** - Per-row push, pull, delete actions wired to existing API endpoints (completed 2026-04-14)
+- [x] **Phase 3: Bulk Select** - Multi-select mode and bulk push, pull, delete across both views (completed 2026-04-15)
 
 ## Phase Details
 
@@ -31,9 +31,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Three-tab nav, rename view-files to view-local, fix refreshData (no auto server fetch)
-- [ ] 01-02-PLAN.md — Server view HTML + JS: loadServerViewData, folder nav, sync indicators, footer
-- [ ] 01-03-PLAN.md — A11Y CSS fixes (horizontal scroll, touch targets, dark mode) + human verification
+- [x] 01-01-PLAN.md — Three-tab nav, rename view-files to view-local, fix refreshData (no auto server fetch)
+- [x] 01-02-PLAN.md — Server view HTML + JS: loadServerViewData, folder nav, sync indicators, footer
+- [x] 01-03-PLAN.md — A11Y CSS fixes (horizontal scroll, touch targets, dark mode) + human verification
 
 ### Phase 2: Individual Actions
 **Goal**: Users can push, pull, and delete individual files from either view using per-row action buttons wired to the existing API
@@ -48,9 +48,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Action button CSS (.row-actions, .action-btn, hover/mobile visibility rules)
-- [ ] 02-02-PLAN.md — Local file actions: pushFile(), deleteLocalFile(), Actions column in renderFilesTable()
-- [ ] 02-03-PLAN.md — Server file actions: pullFile(), deleteServerFile(), Actions column in renderServerTable() + human verification
+- [x] 02-01-PLAN.md — Action button CSS (.row-actions, .action-btn, hover/mobile visibility rules)
+- [x] 02-02-PLAN.md — Local file actions: pushFile(), deleteLocalFile(), Actions column in renderFilesTable()
+- [x] 02-03-PLAN.md — Server file actions: pullFile(), deleteServerFile(), Actions column in renderServerTable() + human verification
 
 ### Phase 3: Bulk Select
 **Goal**: Users can select multiple files in either view and perform bulk push, pull, or delete in a single action
@@ -65,9 +65,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Bulk-bar CSS/HTML structure, App.bulkMode state, enterBulkMode/clearBulkMode, navigation hooks
-- [ ] 03-02-PLAN.md — Checkbox column injection into both render functions, handleRowCheck/handleSelectAll/updateBulkBar
-- [ ] 03-03-PLAN.md — bulkPush/bulkPull/bulkDeleteLocal/bulkDeleteServer + human verification
+- [x] 03-01-PLAN.md — Bulk-bar CSS/HTML structure, App.bulkMode state, enterBulkMode/clearBulkMode, navigation hooks
+- [x] 03-02-PLAN.md — Checkbox column injection into both render functions, handleRowCheck/handleSelectAll/updateBulkBar
+- [x] 03-03-PLAN.md — bulkPush/bulkPull/bulkDeleteLocal/bulkDeleteServer + human verification
 
 ## Progress
 
@@ -77,5 +77,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Views | 3/3 | Complete   | 2026-04-14 |
-| 2. Individual Actions | 0/3 | Not started | - |
-| 3. Bulk Select | 2/3 | In Progress|  |
+| 2. Individual Actions | 3/3 | Complete | 2026-04-14 |
+| 3. Bulk Select | 3/3 | Complete | 2026-04-15 |
