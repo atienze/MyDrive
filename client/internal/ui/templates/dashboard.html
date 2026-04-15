@@ -619,7 +619,7 @@
       <!-- Breadcrumb + bulk-select trigger -->
       <div class="server-view-header">
         <div id="files-breadcrumb" aria-label="Current path" style="flex:1;min-width:0"></div>
-        <button class="footer-btn active" id="local-select-btn" onclick="enterBulkMode('local')">Select</button>
+        <button class="footer-btn active" id="local-select-btn" onclick="toggleBulkMode('local')">Select</button>
       </div>
 
       <!-- File table (FILE-02, FILE-03, FILE-04) -->
@@ -656,7 +656,7 @@
     <div id="view-server" style="display:none">
       <div class="server-view-header">
         <div id="server-breadcrumb" aria-label="Server path"></div>
-        <button class="footer-btn active" id="server-select-btn" onclick="enterBulkMode('server')">Select</button>
+        <button class="footer-btn active" id="server-select-btn" onclick="toggleBulkMode('server')">Select</button>
         <button class="footer-btn active" onclick="loadServerViewData()">Refresh</button>
       </div>
       <div class="files-table-wrap">
@@ -1276,12 +1276,17 @@
 
     // ---- Bulk select mode (BULK-01, BULK-02, BULK-09) ----
 
+    function toggleBulkMode(view) {
+      if (App.bulkMode[view + 'Active']) {
+        clearBulkMode(view);
+      } else {
+        enterBulkMode(view);
+      }
+    }
+
     function enterBulkMode(view) {
       App.bulkMode[view + 'Active'] = true;
       App.bulkMode[view + 'Selected'].clear();
-      // Toggle Select button: disable it while in bulk mode to prevent double-entry
-      const selectBtn = document.getElementById(view + '-select-btn');
-      if (selectBtn) { selectBtn.disabled = true; selectBtn.style.opacity = '0.5'; }
       if (view === 'local') renderFilesTable();
       else                  renderServerTable();
     }
