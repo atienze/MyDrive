@@ -548,6 +548,10 @@
     .files-table:not(.bulk-active) .th-bulk { display: none; }
     /* Checkbox column td: hidden when not in bulk mode */
     .files-table:not(.bulk-active) .td-bulk { display: none; }
+    /* Hide per-row action buttons when bulk mode is active */
+    .files-table.bulk-active .row-actions { display: none; }
+    /* Pointer cursor on rows in bulk mode for tap affordance */
+    .files-table.bulk-active tbody tr { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -627,15 +631,15 @@
         <table class="files-table" aria-label="Files">
           <thead>
             <tr>
-              <th class="th-bulk" style="width:32px;padding:8px 8px">
-                <input type="checkbox" id="local-select-all" onchange="handleSelectAll('local', this)"
-                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all local files">
-              </th>
               <th style="width:40%">Name</th>
               <th style="width:18%">Modified</th>
               <th style="width:12%">Size</th>
               <th style="width:12%">Sync</th>
-              <th style="width:18%" aria-label="Actions"></th>
+              <th style="width:16%" aria-label="Actions"></th>
+              <th class="th-bulk" style="width:32px;padding:8px 8px">
+                <input type="checkbox" id="local-select-all" onchange="handleSelectAll('local', this)"
+                       style="cursor:pointer;width:16px;height:16px" aria-label="Select all local files">
+              </th>
             </tr>
           </thead>
           <tbody id="files-tbody">
@@ -663,14 +667,14 @@
         <table class="files-table" aria-label="Server files">
           <thead>
             <tr>
+              <th style="width:45%">Name</th>
+              <th style="width:16%">Size</th>
+              <th style="width:18%">Status</th>
+              <th style="width:19%" aria-label="Actions"></th>
               <th class="th-bulk" style="width:32px;padding:8px 8px">
                 <input type="checkbox" id="server-select-all" onchange="handleSelectAll('server', this)"
                        style="cursor:pointer;width:16px;height:16px" aria-label="Select all server files">
               </th>
-              <th style="width:45%">Name</th>
-              <th style="width:16%">Size</th>
-              <th style="width:18%">Status</th>
-              <th style="width:21%" aria-label="Actions"></th>
             </tr>
           </thead>
           <tbody id="server-tbody">
@@ -931,13 +935,13 @@
       // Folder rows first (FILE-03): Modified and Size show em dash
       for (const folderName of folders) {
         const fullFolderPath = App.filesPath + folderName + '/';
-        html += '<tr class="row-folder" onclick="filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
+        html += '<tr class="row-folder" onclick="App.bulkMode.localActive ? void(0) : filesNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
           '<td></td>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '</tr>';
       }
 
@@ -951,12 +955,7 @@
         // Sync dot: real sync status from both maps (FILE-06)
         const status = computeSyncStatus(f.rel_path, App.cachedClientMap || {}, App.cachedServerMap || {});
         const dotHtml = '<span class="sync-dot ' + status + '"></span>';
-        html += '<tr>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
-            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
-            'onchange="handleRowCheck(\'local\', this)" style="cursor:pointer;width:16px;height:16px" ' +
-            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.filesPath.length)) + '">' +
-          '</td>' +
+        html += '<tr onclick="handleRowTap(\'local\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + modified + '</td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
@@ -965,6 +964,11 @@
             '<button class="action-btn" onclick="pushFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Push to server">Push</button>' +
             '<button class="action-btn danger" onclick="deleteLocalFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Delete local file">Delete</button>' +
           '</div></td>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
+            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
+            'onchange="handleRowCheck(\'local\', this)" style="cursor:pointer;width:16px;height:16px" ' +
+            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.filesPath.length)) + '">' +
+          '</td>' +
           '</tr>';
       }
 
@@ -1138,12 +1142,12 @@
       // Folder rows first
       for (const folderName of folders) {
         const fullFolderPath = App.serverPath + folderName + '/';
-        html += '<tr class="row-folder" onclick="serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
+        html += '<tr class="row-folder" onclick="App.bulkMode.serverActive ? void(0) : serverNavTo(\'' + escapeHtml(fullFolderPath) + '\')">' +
           '<td><div class="td-name">' + folderIconSvg() + '<span class="td-name-text">' + escapeHtml(folderName) + '</span></div></td>' +
           '<td class="td-muted">\u2014</td>' +
           '<td></td>' +
           '<td></td>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px"></td>' +
           '</tr>';
       }
 
@@ -1155,12 +1159,7 @@
         const dotHtml = '<span class="sync-dot ' + status + '"></span>';
         // Status label alongside dot for screen reader context
         const statusLabel = status === 'synced' ? 'Synced' : (status === 'amber' ? 'Modified' : 'Server only');
-        html += '<tr>' +
-          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
-            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
-            'onchange="handleRowCheck(\'server\', this)" style="cursor:pointer;width:16px;height:16px" ' +
-            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.serverPath.length)) + '">' +
-          '</td>' +
+        html += '<tr onclick="handleRowTap(\'server\', \'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\', event)">' +
           '<td><div class="td-name">' + extensionBadge(name) + '<span class="td-name-text" title="' + escapeHtml(f.rel_path) + '">' + escapeHtml(name) + '</span></div></td>' +
           '<td class="td-muted td-mono">' + escapeHtml(size) + '</td>' +
           '<td><span style="display:flex;align-items:center;gap:6px">' + dotHtml + '<span class="td-muted" style="font-size:12px">' + statusLabel + '</span></span></td>' +
@@ -1168,6 +1167,11 @@
             '<button class="action-btn" onclick="pullFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Pull to local machine">Pull</button>' +
             '<button class="action-btn danger" onclick="deleteServerFile(\'' + escapeHtml(f.rel_path).replace(/'/g, '&#39;') + '\')" title="Remove from server">Delete</button>' +
           '</div></td>' +
+          '<td class="td-bulk" style="width:32px;padding:12px 8px">' +
+            '<input type="checkbox" class="row-check" data-path="' + escapeHtml(f.rel_path) + '" ' +
+            'onchange="handleRowCheck(\'server\', this)" style="cursor:pointer;width:16px;height:16px" ' +
+            'aria-label="Select ' + escapeHtml(f.rel_path.slice(App.serverPath.length)) + '">' +
+          '</td>' +
           '</tr>';
       }
 
@@ -1226,6 +1230,21 @@
     }
 
     // ---- Bulk selection state management (BULK-03, BULK-04) ----
+
+    // Called when clicking anywhere on a file row in bulk mode (BULK-10).
+    // Toggles the row's checkbox without double-firing when clicking directly on the input.
+    function handleRowTap(view, relPath, event) {
+      // Only act when bulk mode is active
+      if (!App.bulkMode[view + 'Active']) return;
+      // Don't double-fire if the click was directly on the checkbox input
+      if (event.target.tagName === 'INPUT' && event.target.type === 'checkbox') return;
+      // Find the checkbox for this row and toggle it
+      const tbodyId = view === 'local' ? 'files-tbody' : 'server-tbody';
+      const cb = document.querySelector('#' + tbodyId + ' input.row-check[data-path="' + CSS.escape(relPath) + '"]');
+      if (!cb) return;
+      cb.checked = !cb.checked;
+      handleRowCheck(view, cb);
+    }
 
     // Called when an individual row checkbox changes.
     // Updates the Set and refreshes the select-all indicator and bulk bar.
