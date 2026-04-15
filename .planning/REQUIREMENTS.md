@@ -32,22 +32,22 @@
 
 ### Bulk Select
 
-- [ ] **BULK-01**: User can enter bulk-select mode in Local Files view (checkbox column or select-all toggle)
-- [ ] **BULK-02**: User can enter bulk-select mode in Server view
-- [ ] **BULK-03**: User can select individual files via checkbox; select-all toggles all visible rows
-- [ ] **BULK-04**: Bulk action bar appears when one or more items are selected, showing available actions and selection count
+- [x] **BULK-01**: User can enter bulk-select mode in Local Files view (checkbox column or select-all toggle)
+- [x] **BULK-02**: User can enter bulk-select mode in Server view
+- [x] **BULK-03**: User can select individual files via checkbox; select-all toggles all visible rows
+- [x] **BULK-04**: Bulk action bar appears when one or more items are selected, showing available actions and selection count
 - [ ] **BULK-05**: User can bulk push selected local files to server
 - [ ] **BULK-06**: User can bulk pull selected server files to local machine
 - [ ] **BULK-07**: User can bulk delete selected server files (with confirmation showing count)
 - [ ] **BULK-08**: User can bulk delete selected local files (with confirmation showing count)
-- [ ] **BULK-09**: Bulk-select mode is cancelled when user switches tabs or navigates to a subfolder
+- [x] **BULK-09**: Bulk-select mode is cancelled when user switches tabs or navigates to a subfolder
 
 ### Layout & Accessibility
 
 - [x] **A11Y-01**: All interactive elements have minimum 44×44px touch target on mobile
 - [x] **A11Y-02**: File tables scroll horizontally on small screens rather than overflowing/clipping
 - [x] **A11Y-03**: Action buttons in file rows are visible on hover (desktop) and always visible on mobile
-- [ ] **A11Y-04**: Bulk action bar is fixed/sticky so it remains visible when scrolling a long file list
+- [x] **A11Y-04**: Bulk action bar is fixed/sticky so it remains visible when scrolling a long file list
 - [x] **A11Y-05**: Minimal theme is maintained — no decorative color, consistent with existing CSS variable system
 - [x] **A11Y-06**: Dark mode support is maintained for all new UI elements
 
@@ -99,19 +99,19 @@
 | SERV-06 | Phase 2 | Pending |
 | SERV-07 | Phase 1 | Complete |
 | SERV-08 | Phase 1 | Complete |
-| BULK-01 | Phase 3 | Pending |
-| BULK-02 | Phase 3 | Pending |
-| BULK-03 | Phase 3 | Pending |
-| BULK-04 | Phase 3 | Pending |
+| BULK-01 | Phase 3 | Complete |
+| BULK-02 | Phase 3 | Complete |
+| BULK-03 | Phase 3 | Complete |
+| BULK-04 | Phase 3 | Complete |
 | BULK-05 | Phase 3 | Pending |
 | BULK-06 | Phase 3 | Pending |
 | BULK-07 | Phase 3 | Pending |
 | BULK-08 | Phase 3 | Pending |
-| BULK-09 | Phase 3 | Pending |
+| BULK-09 | Phase 3 | Complete |
 | A11Y-01 | Phase 1 | Complete |
 | A11Y-02 | Phase 1 | Complete |
 | A11Y-03 | Phase 2 | Complete |
-| A11Y-04 | Phase 3 | Pending |
+| A11Y-04 | Phase 3 | Complete |
 | A11Y-05 | Phase 1 | Complete |
 | A11Y-06 | Phase 1 | Complete |
 
