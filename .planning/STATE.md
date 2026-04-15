@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-14T23:34:40.529Z"
+stopped_at: "Completed quick task 3: bulk select mode persists on nav"
+last_updated: "2026-04-15T07:33:01.038Z"
 last_activity: "2026-04-14 - Completed quick task 2: fix sync status indicators not updating after push/pull actions"
 progress:
   total_phases: 3
@@ -98,9 +98,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | Fix push/pull button functionality in local and server file tabs | 2026-04-14 | 13deca9 | [1-fix-push-pull-button-functionality-in-lo](./quick/1-fix-push-pull-button-functionality-in-lo/) |
 | 2 | Fix sync dot not turning green after push (renderFilesTable after loadServerViewData) | 2026-04-14 | fa456be | [2-fix-sync-status-indicators-not-updating-](./quick/2-fix-sync-status-indicators-not-updating-/) |
+| 3 | Bulk select mode persists on tab/folder navigation; Select button toggles mode | 2026-04-15 | 46ace8b | [3-bulk-select-mode-persists-on-nav-cleared](./quick/3-bulk-select-mode-persists-on-nav-cleared/) |
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:34:40.526Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-15T07:33:01.025Z
+Stopped at: Completed quick task 3: bulk select mode persists on nav
 Resume file: None
