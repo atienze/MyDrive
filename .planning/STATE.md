@@ -5,7 +5,7 @@ milestone_name: milestone
 status: complete
 stopped_at: "Completed all 3 phases of dashboard overhaul milestone"
 last_updated: "2026-04-15"
-last_activity: "2026-04-15 - Completed quick task 4: verify if i have any remaining plan phases left. I verified all features work myself"
+last_activity: "2026-04-15 - Completed quick task 7: fix selected items not staying highlighted in bulk mode"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 Phase: 3 of 3 (Bulk Select) — all phases complete
 Plan: 9 of 9 complete
 Status: Milestone complete
-Last activity: 2026-04-15 - Completed quick task 4: verify remaining plan phases
+Last activity: 2026-04-15 - Completed quick task 7: fix selected items not staying highlighted in bulk mode
 
 Progress: [██████████] 100%
 
@@ -102,9 +102,10 @@ None yet.
 | 4 | Verify remaining plan phases — created missing SUMMARYs for 02-03 and 03-03, marked all 3 phases complete in ROADMAP.md and STATE.md | 2026-04-15 | (see final commit) | [4-verify-if-i-have-any-remaining-plan-phas](./quick/4-verify-if-i-have-any-remaining-plan-phas/) |
 | 5 | Move bulk checkboxes to right side of file rows, hide action buttons in bulk mode, row-tap to toggle selection | 2026-04-15 | c1dd18d | [5-move-select-checkboxes-closer-to-select-](./quick/5-move-select-checkboxes-closer-to-select-/) |
 | 6 | Fix folder nav in bulk mode, replace checkboxes with row-highlight, add Select All button, fix stale panel after bulk ops | 2026-04-15 | 7d69e79 | [6-fix-select-mode-navigation-replace-check](./quick/6-fix-select-mode-navigation-replace-check/) |
+| 7 | Fix row-selected highlight disappearing on hover in bulk select mode — added explicit :hover rule with brighter alpha | 2026-04-15 | 203077b | [7-all-elements-of-the-last-quickplan-work-](./quick/7-all-elements-of-the-last-quickplan-work-/) |
 
 ## Session Continuity
 
 Last session: 2026-04-15
-Stopped at: Completed quick task 6; awaiting human verification checkpoint
+Stopped at: Completed quick task 7; awaiting human verification checkpoint
 Resume file: None
